@@ -17,10 +17,10 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd ~/social
+            cd ~/mathstore
 
             git fetch --all
             git reset --hard origin/server
             git pull origin server
 
-            sudo systemctl restart chemstore
+            sudo systemctl restart mathstore
