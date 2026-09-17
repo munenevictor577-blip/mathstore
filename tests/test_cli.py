@@ -362,4 +362,75 @@ class TestCLI:
         main()
         assert "t =" in capsys.readouterr().out
 
+    def test_cli_solve_steps(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test solve subcommand with --steps flag."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "solve", "2*x + 4 = 10", "--steps"])
+        main()
+        captured = capsys.readouterr().out
+        assert "Step-by-step solution for 2*x + 4 = 10:" in captured
+        assert "Linear form" in captured or "linear" in captured.lower()
+        assert "Solution: x = [3]" in captured
+
+    def test_cli_diff_steps(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test diff subcommand with --steps flag."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "diff", "x**2 * sin(x)", "--steps"])
+        main()
+        captured = capsys.readouterr().out
+        assert "Step-by-step differentiation of x**2 * sin(x):" in captured
+        assert "Product Rule" in captured
+        assert "Derivative (order 1):" in captured
+
+    def test_cli_integrate_steps(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test integrate subcommand with --steps flag."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "integrate", "x * exp(x)", "--steps"])
+        main()
+        captured = capsys.readouterr().out
+        assert "Step-by-step integration of x * exp(x):" in captured
+        assert "Parts" in captured or "parts" in captured.lower()
+        assert "Integral:" in captured
+
+    def test_cli_integrate_definite_steps(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test integrate subcommand with limits and --steps flag."""
+        monkeypatch.setattr(
+            sys, "argv", ["mathstore", "integrate", "x**2", "--limits", "0", "2", "--steps"]
+        )
+        main()
+        captured = capsys.readouterr().out
+        assert "Step-by-step integration of x**2 definite integral from 0.0 to 2.0:" in captured
+        assert "Fundamental Theorem of Calculus" in captured
+        assert "Integral: 2.666" in captured
+
+    def test_cli_practice_generate_single(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test practice subcommand in non-interactive generate mode."""
+        monkeypatch.setattr(
+            sys, "argv", ["mathstore", "practice", "--generate", "--topic", "algebra", "--seed", "42"]
+        )
+        main()
+        captured = capsys.readouterr().out
+        assert "[ALGEBRA]" in captured
+        assert "Hint:" in captured
+        assert "Step-by-step solution:" in captured
+
+    def test_cli_practice_generate_multiple(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test practice subcommand generating multiple questions."""
+        monkeypatch.setattr(
+            sys, "argv", ["mathstore", "practice", "--generate", "-n", "2", "--seed", "42"]
+        )
+        main()
+        captured = capsys.readouterr().out
+        assert "Question #1:" in captured
+        assert "Question #2:" in captured
+
+    def test_cli_practice_interactive(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test practice subcommand interactive mode with quit command."""
+        import builtins
+
+        monkeypatch.setattr(builtins, "input", lambda _: "quit")
+        monkeypatch.setattr(sys, "argv", ["mathstore", "practice", "derivatives"])
+        main()
+        captured = capsys.readouterr().out
+        assert "MathStore University Practice & Revision Quizzer" in captured
+        assert "Exiting practice session early" in captured
+
+
 

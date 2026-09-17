@@ -1,4 +1,5 @@
 import argparse
+import random
 import sys
 
 from mathstore.algebra.solver import EquationSolver
@@ -21,6 +22,7 @@ def main():
     solve_parser.add_argument("--var", type=str, default="x", help="Variable to isolate (default: x)")
     solve_parser.add_argument("--latex", action="store_true", help="Output solution in LaTeX format")
     solve_parser.add_argument("--pretty", action="store_true", help="Output solution in pretty Unicode format")
+    solve_parser.add_argument("--steps", action="store_true", help="Output step-by-step solution breakdown")
 
     diff_parser = subparsers.add_parser("diff", help="Differentiate a mathematical expression")
     diff_parser.add_argument("expression", type=str, help="Expression to differentiate (e.g., sin(x)*x)")
@@ -28,6 +30,7 @@ def main():
     diff_parser.add_argument("--order", type=int, default=1, help="Derivative order (default: 1)")
     diff_parser.add_argument("--latex", action="store_true", help="Output derivative in LaTeX format")
     diff_parser.add_argument("--pretty", action="store_true", help="Output derivative in pretty Unicode format")
+    diff_parser.add_argument("--steps", action="store_true", help="Output step-by-step differentiation breakdown")
 
     int_parser = subparsers.add_parser("integrate", help="Find the integral of an expression.")
     int_parser.add_argument("expression", type=str, help="Expression to integrate.")
@@ -41,6 +44,7 @@ def main():
     )
     int_parser.add_argument("--latex", action="store_true", help="Output integral in LaTeX format")
     int_parser.add_argument("--pretty", action="store_true", help="Output integral in pretty Unicode format")
+    int_parser.add_argument("--steps", action="store_true", help="Output step-by-step integration breakdown")
 
     limit_parser = subparsers.add_parser("limit", help="Calculate the limit of an expression")
     limit_parser.add_argument("expression", type=str, help="Expression to evaluate (e.g., sin(x)/x)")
@@ -143,6 +147,51 @@ def main():
     ttest_p.add_argument("--latex", action="store_true", help="Output in LaTeX format")
     ttest_p.add_argument("--pretty", action="store_true", help="Output in pretty Unicode format")
 
+    practice_p = subparsers.add_parser(
+        "practice", help="Interactive active-recall quizzer for university revision"
+    )
+    practice_p.add_argument(
+        "topic",
+        type=str,
+        nargs="?",
+        default="all",
+        help="Practice topic (derivatives, integrals, algebra, matrix, stats, or all)",
+    )
+    practice_p.add_argument(
+        "--topic",
+        "-t",
+        dest="topic_opt",
+        type=str,
+        default=None,
+        help="Practice topic option (alternative to positional argument)",
+    )
+    practice_p.add_argument(
+        "--count",
+        "-n",
+        type=int,
+        default=None,
+        help="Number of questions (default: 5 for quiz, 1 for --generate)",
+    )
+    practice_p.add_argument(
+        "--difficulty",
+        "-d",
+        choices=["easy", "medium", "hard", "all"],
+        default="medium",
+        help="Question difficulty (default: medium)",
+    )
+    practice_p.add_argument(
+        "--generate",
+        "-g",
+        action="store_true",
+        help="Generate questions with hints and step solutions non-interactively",
+    )
+    practice_p.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Random seed for reproducible question generation",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -154,6 +203,11 @@ def main():
 
         if args.command == "solve":
             solver = EquationSolver()
+            if getattr(args, "steps", False):
+                steps = solver.solve_steps(args.equation, args.var)
+                print(f"Step-by-step solution for {args.equation}:")
+                for idx, s in enumerate(steps, 1):
+                    print(f"  {idx}. {s}")
             result = solver.solve_linear(args.equation, args.var)
             if fmt == "str":
                 print(f"Solution: {args.var} = {result}")
@@ -162,6 +216,11 @@ def main():
 
         elif args.command == "diff":
             calc = CalculusAnalyzer()
+            if getattr(args, "steps", False):
+                steps = calc.differentiate_steps(args.expression, args.var, args.order)
+                print(f"Step-by-step differentiation of {args.expression}:")
+                for idx, s in enumerate(steps, 1):
+                    print(f"  {idx}. {s}")
             result = calc.differentiate(args.expression, args.var, args.order, format=fmt)
             if fmt == "str":
                 print(f"Derivative (order {args.order}): {result}")
@@ -170,6 +229,16 @@ def main():
 
         elif args.command == "integrate":
             calc = CalculusAnalyzer()
+            if getattr(args, "steps", False):
+                steps = calc.integrate_steps(args.expression, args.var, args.limits)
+                lim_text = (
+                    f" definite integral from {args.limits[0]} to {args.limits[1]}"
+                    if args.limits
+                    else ""
+                )
+                print(f"Step-by-step integration of {args.expression}{lim_text}:")
+                for idx, s in enumerate(steps, 1):
+                    print(f"  {idx}. {s}")
             result = calc.integrate(args.expression, args.var, args.limits, format=fmt)
             if fmt == "str":
                 print(f"Integral: {result}")
@@ -261,6 +330,34 @@ def main():
                         args.data, args.pop_mean, alternative=args.alt, format=fmt
                     )
                 )
+
+        elif args.command == "practice":
+            topic = args.topic_opt if args.topic_opt else args.topic
+            if args.generate:
+                count = args.count if args.count is not None else 1
+                from mathstore.study.practice import (
+                    format_question_card,
+                    generate_question,
+                )
+
+                rng = random.Random(args.seed) if args.seed is not None else None
+                for i in range(1, count + 1):
+                    q = generate_question(topic=topic, difficulty=args.difficulty, rng=rng)
+                    card = format_question_card(q, index=i if count > 1 else None)
+                    print(card)
+                    if i < count:
+                        print("-" * 40)
+            else:
+                count = args.count if args.count is not None else 5
+                from mathstore.study.practice import PracticeSession
+
+                session = PracticeSession(
+                    topic=topic,
+                    count=count,
+                    difficulty=args.difficulty,
+                    seed=args.seed,
+                )
+                session.run()
 
     except Exception as e:  # noqa: BLE001
         print(f"Error executing '{args.command}' : {e}", file=sys.stderr)

@@ -112,4 +112,37 @@ class CalculusAnalyzer:
         except Exception as e:  # noqa: BLE001
             raise ValueError(f"Calculus error during limit calculation: {e}")
 
+    def differentiate_steps(
+        self, expression_str: str, variable: str = 'x', order: int = 1
+    ) -> list[str]:
+        """
+        Returns step-by-step differentiation of an expression.
+
+        Args:
+            expression_str: The mathematical expression.
+            variable: The variable to differentiate against (default: 'x').
+            order: The derivative order (default: 1).
+        """
+        from mathstore.study.steps import get_derivative_steps
+
+        return get_derivative_steps(expression_str, variable=variable, order=order)
+
+    def integrate_steps(
+        self,
+        expression_str: str,
+        variable: str = 'x',
+        limits: tuple[float, float] | None = None,
+    ) -> list[str]:
+        """
+        Returns step-by-step breakdown of indefinite or definite integration.
+
+        Args:
+            expression_str: The mathematical expression to integrate.
+            variable: The variable of integration (default: 'x').
+            limits: Optional tuple of (lower_bound, upper_bound) for definite integrals.
+        """
+        from mathstore.study.steps import get_integral_steps
+
+        return get_integral_steps(expression_str, variable=variable, limits=limits)
+
         

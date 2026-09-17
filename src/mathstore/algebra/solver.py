@@ -52,3 +52,15 @@ class EquationSolver:
             return f"{variable} ∈ {{{inner}}}"
 
         return f"Solution: {variable} = {solutions}"
+
+    def solve_steps(self, equation_str: str, variable: str = "x") -> list[str]:
+        """
+        Returns step-by-step algebraic isolation and solution breakdown for an equation.
+
+        Args:
+            equation_str: The equation to solve (e.g., '2*x + 4 = 10').
+            variable: The variable to isolate (default: 'x').
+        """
+        from mathstore.study.steps import get_equation_steps
+
+        return get_equation_steps(equation_str, variable=variable)
