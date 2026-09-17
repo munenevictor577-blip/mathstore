@@ -1,1 +1,3 @@
-"""Core mathematical structures and abstractions."""
+from mathstore.core.matrix import MatrixAnalyzer
+
+__all__ = ["MatrixAnalyzer"]

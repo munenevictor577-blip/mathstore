@@ -232,4 +232,134 @@ class TestCLI:
         captured = capsys.readouterr()
         assert "Unknown reference topic 'unknown_topic'" in captured.err
 
+    # --- Matrix CLI Tests ---
+
+    def test_cli_matrix_operations(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test matrix operations: det, inv, rref, rank, nullity, trace, transpose, charpoly."""
+        m_2x2 = "1, 2; 3, 4"
+        # Det
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "det", m_2x2])
+        main()
+        assert "-2" in capsys.readouterr().out
+
+        # Det LaTeX & Pretty
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "det", m_2x2, "--latex"])
+        main()
+        assert "-2" in capsys.readouterr().out
+
+        # Inv
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "inv", "1, 0; 0, 2"])
+        main()
+        assert "Matrix" in capsys.readouterr().out
+
+        # RREF
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "rref", m_2x2])
+        main()
+        assert "RREF:" in capsys.readouterr().out
+
+        # Eigen & Eigenvects
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "eigen", "2, 0; 0, 5"])
+        main()
+        assert "2: 1" in capsys.readouterr().out
+
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "eigenvects", "2, 0; 0, 5"])
+        main()
+        assert "λ = 2" in capsys.readouterr().out
+
+        # Rank & Nullity
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "rank", m_2x2])
+        main()
+        assert "Rank: 2" in capsys.readouterr().out
+
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "nullity", m_2x2])
+        main()
+        assert "Nullity: 0" in capsys.readouterr().out
+
+        # Trace
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "trace", m_2x2])
+        main()
+        assert "5" in capsys.readouterr().out
+
+        # Transpose
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "transpose", m_2x2])
+        main()
+        assert "Matrix" in capsys.readouterr().out
+
+        # Charpoly
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "charpoly", m_2x2])
+        main()
+        assert "lambda" in capsys.readouterr().out
+
+    def test_cli_matrix_errors(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test matrix error handling."""
+        # Non-square det
+        monkeypatch.setattr(sys, "argv", ["mathstore", "matrix", "det", "1, 2, 3; 4, 5, 6"])
+        with pytest.raises(SystemExit) as exc:
+            main()
+        assert exc.value.code == 1
+        assert "Error executing 'matrix'" in capsys.readouterr().err
+
+    # --- Stats CLI Tests ---
+
+    def test_cli_stats_summary(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test stats summary command."""
+        data_str = "10, 12, 14, 15, 18"
+        monkeypatch.setattr(sys, "argv", ["mathstore", "stats", "summary", data_str])
+        main()
+        out = capsys.readouterr().out
+        assert "Mean:" in out
+        assert "Median:" in out
+
+        # LaTeX & Pretty
+        monkeypatch.setattr(sys, "argv", ["mathstore", "stats", "summary", data_str, "--latex"])
+        main()
+        assert r"\begin{tabular}" in capsys.readouterr().out
+
+        monkeypatch.setattr(sys, "argv", ["mathstore", "stats", "summary", data_str, "--pretty"])
+        main()
+        assert "┌─────────────┬──────────┐" in capsys.readouterr().out
+
+    def test_cli_stats_distributions(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test stats normal, binomial, and poisson distributions."""
+        # Normal
+        monkeypatch.setattr(sys, "argv", ["mathstore", "stats", "normal", "1.96", "--mu", "0", "--sigma", "1"])
+        main()
+        out_n = capsys.readouterr().out
+        assert "Normal N" in out_n
+        assert "z-score:" in out_n
+
+        # Binomial
+        monkeypatch.setattr(sys, "argv", ["mathstore", "stats", "binomial", "2", "--n", "4", "--p", "0.5"])
+        main()
+        out_b = capsys.readouterr().out
+        assert "Binomial" in out_b
+        assert "P(X = k):" in out_b
+
+        # Poisson
+        monkeypatch.setattr(sys, "argv", ["mathstore", "stats", "poisson", "1", "--lam", "2.0"])
+        main()
+        out_p = capsys.readouterr().out
+        assert "Poisson" in out_p
+
+    def test_cli_stats_inference(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test stats CI and t-test commands."""
+        data_str = "10, 12, 11, 14, 13"
+        # CI
+        monkeypatch.setattr(sys, "argv", ["mathstore", "stats", "ci", data_str, "--confidence", "0.95"])
+        main()
+        assert "Confidence Interval:" in capsys.readouterr().out
+
+        monkeypatch.setattr(sys, "argv", ["mathstore", "stats", "ci", data_str, "--latex"])
+        main()
+        assert r"\text{ CI}" in capsys.readouterr().out
+
+        # T-test
+        monkeypatch.setattr(sys, "argv", ["mathstore", "stats", "ttest", data_str, "--pop-mean", "10.0"])
+        main()
+        assert "t_statistic" in capsys.readouterr().out
+
+        monkeypatch.setattr(sys, "argv", ["mathstore", "stats", "ttest", data_str, "--pop-mean", "10.0", "--latex"])
+        main()
+        assert "t =" in capsys.readouterr().out
+
 

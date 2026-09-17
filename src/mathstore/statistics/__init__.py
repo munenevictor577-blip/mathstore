@@ -1,1 +1,3 @@
-"""Statistical methods and data analysis tools."""
+from mathstore.statistics.analyzer import StatsAnalyzer
+
+__all__ = ["StatsAnalyzer"]

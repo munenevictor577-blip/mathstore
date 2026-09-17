@@ -3,7 +3,9 @@ import sys
 
 from mathstore.algebra.solver import EquationSolver
 from mathstore.calculus.analyzer import CalculusAnalyzer
+from mathstore.core.matrix import MatrixAnalyzer
 from mathstore.reference import get_reference, list_topics_formatted
+from mathstore.statistics.analyzer import StatsAnalyzer
 
 
 def main():
@@ -62,6 +64,85 @@ def main():
         "--latex", action="store_true", help="Output reference cheat sheet in LaTeX format"
     )
 
+    matrix_parser = subparsers.add_parser("matrix", help="Matrix operations & linear algebra")
+    matrix_parser.add_argument(
+        "operation",
+        choices=[
+            "det",
+            "inv",
+            "rref",
+            "eigen",
+            "eigenvects",
+            "rank",
+            "nullity",
+            "trace",
+            "transpose",
+            "charpoly",
+        ],
+        help="Matrix operation to perform",
+    )
+    matrix_parser.add_argument(
+        "matrix",
+        type=str,
+        help="Matrix input (e.g. '1, 2; 3, 4' or '[[1, 2], [3, 4]]')",
+    )
+    matrix_parser.add_argument(
+        "--latex", action="store_true", help="Output matrix result in LaTeX format"
+    )
+    matrix_parser.add_argument(
+        "--pretty", action="store_true", help="Output matrix result in pretty Unicode format"
+    )
+
+    stats_parser = subparsers.add_parser(
+        "stats", help="Descriptive statistics, distributions & hypothesis testing"
+    )
+    stats_sub = stats_parser.add_subparsers(dest="stats_command", required=True)
+
+    summary_p = stats_sub.add_parser("summary", help="Calculate 5-number & distribution summary")
+    summary_p.add_argument(
+        "data", type=str, help="Dataset (e.g. '10, 12, 14, 15, 18' or '[10, 12, 14]')"
+    )
+    summary_p.add_argument("--latex", action="store_true", help="Output in LaTeX tabular format")
+    summary_p.add_argument("--pretty", action="store_true", help="Output in pretty Unicode format")
+
+    normal_p = stats_sub.add_parser("normal", help="Normal distribution PDF, CDF, and z-score")
+    normal_p.add_argument("x", type=float, help="Value to evaluate")
+    normal_p.add_argument("--mu", type=float, default=0.0, help="Mean mu (default: 0.0)")
+    normal_p.add_argument(
+        "--sigma", type=float, default=1.0, help="Standard deviation sigma (default: 1.0)"
+    )
+
+    bin_p = stats_sub.add_parser("binomial", help="Binomial distribution PMF and CDF")
+    bin_p.add_argument("k", type=int, help="Number of successes")
+    bin_p.add_argument("--n", type=int, required=True, help="Number of trials")
+    bin_p.add_argument("--p", type=float, required=True, help="Success probability")
+
+    pois_p = stats_sub.add_parser("poisson", help="Poisson distribution PMF and CDF")
+    pois_p.add_argument("k", type=int, help="Number of occurrences")
+    pois_p.add_argument("--lam", type=float, required=True, help="Rate parameter lambda")
+
+    ci_p = stats_sub.add_parser("ci", help="Confidence interval for sample mean")
+    ci_p.add_argument("data", type=str, help="Sample dataset")
+    ci_p.add_argument(
+        "--confidence", type=float, default=0.95, help="Confidence level (default: 0.95)"
+    )
+    ci_p.add_argument("--latex", action="store_true", help="Output in LaTeX format")
+    ci_p.add_argument("--pretty", action="store_true", help="Output in pretty Unicode format")
+
+    ttest_p = stats_sub.add_parser("ttest", help="One-sample Student's t-test")
+    ttest_p.add_argument("data", type=str, help="Sample dataset")
+    ttest_p.add_argument(
+        "--pop-mean", type=float, required=True, help="Null hypothesis population mean"
+    )
+    ttest_p.add_argument(
+        "--alt",
+        choices=["two-sided", "greater", "less"],
+        default="two-sided",
+        help="Alternative hypothesis (default: two-sided)",
+    )
+    ttest_p.add_argument("--latex", action="store_true", help="Output in LaTeX format")
+    ttest_p.add_argument("--pretty", action="store_true", help="Output in pretty Unicode format")
+
     args = parser.parse_args()
 
     try:
@@ -108,6 +189,78 @@ def main():
                 print(list_topics_formatted())
             else:
                 print(get_reference(args.topic, latex=args.latex))
+
+        elif args.command == "matrix":
+            mat_calc = MatrixAnalyzer()
+            if args.operation == "det":
+                print(mat_calc.determinant(args.matrix, format=fmt))
+            elif args.operation == "inv":
+                print(mat_calc.inverse(args.matrix, format=fmt))
+            elif args.operation == "rref":
+                print(mat_calc.rref(args.matrix, format=fmt))
+            elif args.operation == "eigen":
+                print(mat_calc.eigenvalues(args.matrix, format=fmt))
+            elif args.operation == "eigenvects":
+                print(mat_calc.eigenvectors(args.matrix, format=fmt))
+            elif args.operation == "rank":
+                print(f"Rank: {mat_calc.rank(args.matrix)}")
+            elif args.operation == "nullity":
+                print(f"Nullity: {mat_calc.nullity(args.matrix)}")
+            elif args.operation == "trace":
+                print(mat_calc.trace(args.matrix, format=fmt))
+            elif args.operation == "transpose":
+                print(mat_calc.transpose(args.matrix, format=fmt))
+            elif args.operation == "charpoly":
+                print(mat_calc.characteristic_polynomial(args.matrix, format=fmt))
+
+        elif args.command == "stats":
+            stats_calc = StatsAnalyzer()
+            if args.stats_command == "summary":
+                print(stats_calc.summary(args.data, format=fmt))
+            elif args.stats_command == "normal":
+                pdf = stats_calc.normal_pdf(args.x, args.mu, args.sigma)
+                cdf_val = stats_calc.normal_cdf(args.x, args.mu, args.sigma)
+                z = stats_calc.z_score(args.x, args.mu, args.sigma)
+                print(
+                    f"Normal N(μ={args.mu}, σ={args.sigma}) at x={args.x}:\n"
+                    f"  z-score: {z:.4f}\n"
+                    f"  PDF:     {pdf:.6f}\n"
+                    f"  CDF:     {cdf_val:.6f}"
+                )
+            elif args.stats_command == "binomial":
+                pmf = stats_calc.binomial_pmf(args.k, args.n, args.p)
+                cdf_val = stats_calc.binomial_cdf(args.k, args.n, args.p)
+                print(
+                    f"Binomial(n={args.n}, p={args.p}) at k={args.k}:\n"
+                    f"  P(X = k):  {pmf:.6f}\n"
+                    f"  P(X <= k): {cdf_val:.6f}"
+                )
+            elif args.stats_command == "poisson":
+                pmf = stats_calc.poisson_pmf(args.k, args.lam)
+                cdf_val = stats_calc.poisson_cdf(args.k, args.lam)
+                print(
+                    f"Poisson(λ={args.lam}) at k={args.k}:\n"
+                    f"  P(X = k):  {pmf:.6f}\n"
+                    f"  P(X <= k): {cdf_val:.6f}"
+                )
+            elif args.stats_command == "ci":
+                ci_res = stats_calc.confidence_interval(
+                    args.data, confidence=args.confidence, format=fmt
+                )
+                if fmt == "str":
+                    lower, upper, margin = ci_res
+                    pct = int(args.confidence * 100)
+                    print(
+                        f"{pct}% Confidence Interval: [{lower}, {upper}] (margin: ±{margin})"
+                    )
+                else:
+                    print(ci_res)
+            elif args.stats_command == "ttest":
+                print(
+                    stats_calc.one_sample_t_test(
+                        args.data, args.pop_mean, alternative=args.alt, format=fmt
+                    )
+                )
 
     except Exception as e:  # noqa: BLE001
         print(f"Error executing '{args.command}' : {e}", file=sys.stderr)
