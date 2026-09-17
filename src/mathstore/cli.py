@@ -4,15 +4,16 @@ import sys
 from mathstore.algebra.solver import EquationSolver
 from mathstore.calculus.analyzer import CalculusAnalyzer
 
+
 def main():
     parser = argparse.ArgumentParser(
         prog="mathstore",
-        description="MathStore CLI: A clean , modular mathematical toolkit"
+        description="MathStore CLI: A clean, modular mathematical toolkit"
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    solve_parser = subparsers.add_parser("solve", help="Solve an algabraic equation")
+    solve_parser = subparsers.add_parser("solve", help="Solve an algebraic equation")
     solve_parser.add_argument("equation", type=str, help="Equation to solve (e.g., 2*x + 4 = 10)")
     solve_parser.add_argument("--var", type=str, default="x", help="Variable to isolate (default: x)")
 
@@ -23,8 +24,13 @@ def main():
 
     int_parser = subparsers.add_parser("integrate", help="Find the integral of an expression.")
     int_parser.add_argument("expression", type=str, help="Expression to integrate.")
-    int_parser.add_argument("--var", type=str, default="x", help="variable of integration (default: X)")
-    int_parser.add_argument("--limits", type=tuple, default=None, help="The upper and lower bound for a definite integral (lower, upper)")
+    int_parser.add_argument("--var", type=str, default="x", help="Variable of integration (default: x)")
+    int_parser.add_argument("--limits", nargs=2, type=float, default=None, help="The upper and lower bound for a definite integral (lower, upper)")
+
+    limit_parser = subparsers.add_parser("limit", help="Calculate the limit of an expression")
+    limit_parser.add_argument("expression", type=str, help="Expression to evaluate (e.g., sin(x)/x)")
+    limit_parser.add_argument("target", type=str, help="Target value the variable approaches (e.g., 0, oo)")
+    limit_parser.add_argument("--var", type=str, default="x", help="Variable for limit calculation (default: x)")
 
     args = parser.parse_args()
 
@@ -44,7 +50,12 @@ def main():
             result = calc.integrate(args.expression, args.var, args.limits)
             print(f"Integral: {result}")
 
-    except Exception as e:
+        elif args.command == "limit":
+            calc = CalculusAnalyzer()
+            result = calc.get_limit(args.expression, args.target, args.var)
+            print(f"Limit: {result}")
+
+    except Exception as e:  # noqa: BLE001
         print(f"Error executing '{args.command}' : {e}", file=sys.stderr)
         sys.exit(1)
 

@@ -1,39 +1,38 @@
 import sympy as sp
-from typing import Optional
+
 
 class CalculusAnalyzer:
     """Handles differentiation and integration, shielding user from Sympy internals."""
+
     def __init__(self):
         self.x, self.y, self.z, self.t = sp.symbols('x y z t')
 
-    def differentiate(self, expression_str: str, variable: str = 'x', order: int = 1):
+    def differentiate(self, expression_str: str, variable: str = 'x', order: int = 1) -> str:
         """
-        Calculates the nth derivative of an algabraic expression.
+        Calculates the nth derivative of an algebraic expression.
 
         Args:
-            expression_str: The mathematical expression(e.g 'sin(x) * exp(x)')
-            variable: The variable to differentiate wit respect to
-            order: The degree of the derivative
+            expression_str: The mathematical expression (e.g. 'sin(x) * exp(x)')
+            variable: The variable to differentiate with respect to (default: 'x')
+            order: The degree of the derivative (default: 1)
         """
-
         try:
             var = sp.Symbol(variable)
             expr = sp.sympify(expression_str)
             result = sp.diff(expr, var, order)
-            return str(sp.sympify(result))
-        except Exception as e:
-            raise ValueError(f"Calculus error during differentiation")
+            return str(result)
+        except Exception as e:  # noqa: BLE001
+            raise ValueError(f"Calculus error during differentiation: {e}")
 
-    def integrate(self, expression_str: str, variable: str = 'x', limits: Optional[tuple[float, float]] = None) -> str:
+    def integrate(self, expression_str: str, variable: str = 'x', limits: tuple[float, float] | None = None) -> str:
         """
-        Calculuates either the indefinite or definite integral
+        Calculates either the indefinite or definite integral.
 
         Args:
             expression_str: The mathematical expression to integrate.
-            variable: The integration variable.
-            limits: A tuple of (lower_bound, upper_bound) for definite intergrals
+            variable: The integration variable (default: 'x').
+            limits: A tuple of (lower_bound, upper_bound) for definite integrals
         """
-
         try:
             var = sp.Symbol(variable)
             expr = sp.sympify(expression_str)
@@ -44,26 +43,26 @@ class CalculusAnalyzer:
             else:
                 result = sp.integrate(expr, var)
 
-            return str(sp.sympify(result))
-        except Exception as e:
+            return str(result)
+        except Exception as e:  # noqa: BLE001
             raise ValueError(f"Calculus error during integration: {e}")
 
-
-    def get_limit(self, expression_str: str, variable: str = 'x', limits: Optional[float] = None) -> str:
+    def get_limit(self, expression_str: str, limits: float | sp.Basic | str, variable: str = 'x') -> str:
         """
         Calculates the limit of a mathematical expression.
 
         Args:
             expression_str: The mathematical expression.
-            variable: The limit variable.
             limits: The value towards which the variable tends to.
+            variable: The limit variable (default: 'x').
         """
         try:
             var = sp.Symbol(variable)
             expr = sp.sympify(expression_str)
-            result = sp.limit(expr, var, limits)
-
-            return str(sp.sympify(result))
-        except Exception as e:
+            target = sp.sympify(limits)
+            result = sp.limit(expr, var, target)
+            return str(result)
+        except Exception as e:  # noqa: BLE001
             raise ValueError(f"Calculus error during limit calculation: {e}")
+
         
