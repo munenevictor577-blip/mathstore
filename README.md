@@ -1,7 +1,7 @@
 # MathStore 🎓
 
-[![Tests](https://img.shields.io/badge/tests-193%20passed-success)](https://github.com/mark/mathstore)
-[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/mark/mathstore)
+[![Tests](https://img.shields.io/badge/tests-232%20passed-success)](https://github.com/munenevictor577-blip/mathstore)
+[![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/munenevictor577-blip/mathstore)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://python.org)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
@@ -19,7 +19,10 @@
   - [Linear Algebra (`matrix`)](#4-linear-algebra-matrix)
   - [Statistics & Hypothesis Testing (`stats`)](#5-statistics--hypothesis-testing-stats)
   - [Formula Reference Cheat Sheets (`ref`)](#6-formula-reference-cheat-sheets-ref)
-  - [Formatting: LaTeX & Unicode (`--latex`, `--pretty`)](#7-formatting-latex--unicode---latex---pretty)
+- [FastAPI Remote Server (`/api/v1/math`)](#fastapi-remote-server-apiv1math)
+  - [Starting the Server](#starting-the-server)
+  - [API Endpoints Overview](#api-endpoints-overview)
+  - [cURL Examples](#curl-examples)
 - [Python Library Usage](#python-library-usage)
   - [Calculus & Derivations](#calculus--derivations)
   - [Equation Solving](#equation-solving)
@@ -236,6 +239,88 @@ mathstore matrix rref "1, 2; 3, 4" --pretty
 
 ---
 
+## FastAPI Remote Server (`/api/v1/math`)
+
+MathStore includes a production-ready FastAPI server with CORS support and OpenAPI documentation, enabling remote calling over HTTP from web applications, mobile clients, and microservices.
+
+### Starting the Server
+
+```bash
+# Using uvicorn directly
+uv run uvicorn mathstore.api.main:app --host 0.0.0.0 --port 8000
+
+# Using the registered script command
+uv run mathstore-server
+
+# Or using the top-level api alias
+uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+- **Interactive Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc Documentation**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- **Health Check**: [http://localhost:8000/api/v1/math/health](http://localhost:8000/api/v1/math/health)
+
+### API Endpoints Overview
+
+All mathematical endpoints are mounted under the `/api/v1/math` prefix:
+
+| Category | Method & Path | Description |
+|---|---|---|
+| **Calculus** | `POST, GET /api/v1/math/diff` | Differentiate with optional steps & formatting |
+| | `POST, GET /api/v1/math/integrate` | Indefinite / definite integral with steps |
+| | `POST, GET /api/v1/math/limit` | Evaluate limits |
+| **Algebra** | `POST, GET /api/v1/math/solve` | Solve equations with optional steps |
+| | `POST, GET /api/v1/math/simplify` | Simplify expressions |
+| **Matrix** | `POST /api/v1/math/matrix/{operation}` | Matrix ops: `det`, `inv`, `rref`, `eigen`, `rank`, `trace`, etc. |
+| **Statistics**| `POST /api/v1/math/stats/summary` | Descriptive summary statistics |
+| | `POST, GET /api/v1/math/stats/normal` | Normal distribution PDF, CDF, z-score |
+| | `POST, GET /api/v1/math/stats/binomial`| Binomial PMF and CDF |
+| | `POST, GET /api/v1/math/stats/poisson` | Poisson PMF and CDF |
+| | `POST /api/v1/math/stats/ci` | Confidence intervals |
+| | `POST /api/v1/math/stats/ttest` | One-sample Student's t-test |
+| **Steps** | `POST, GET /api/v1/math/steps/diff` | Step-by-step differentiation |
+| | `POST, GET /api/v1/math/steps/integrate` | Step-by-step integration |
+| | `POST, GET /api/v1/math/steps/solve` | Step-by-step equation solving |
+| **Practice** | `GET /api/v1/math/practice/question` | Generate randomized revision question |
+| | `POST /api/v1/math/practice/check` | Validate answer with symbolic equivalence |
+| **Reference**| `GET /api/v1/math/ref` | List formula cheat sheet topics |
+| | `GET /api/v1/math/ref/{topic}` | Get cheat sheet (text or LaTeX) |
+| **Health** | `GET /api/v1/math/health` | Service health status |
+
+### cURL Examples
+
+```bash
+# Differentiate with step-by-step breakdown
+curl -X POST http://localhost:8000/api/v1/math/diff \
+  -H "Content-Type: application/json" \
+  -d '{"expression": "x**2 * sin(x)", "steps": true}'
+
+# Definite integration
+curl -X POST http://localhost:8000/api/v1/math/integrate \
+  -H "Content-Type: application/json" \
+  -d '{"expression": "x**2", "limits": [0, 2], "steps": true}'
+
+# Solve an equation
+curl -X POST http://localhost:8000/api/v1/math/solve \
+  -H "Content-Type: application/json" \
+  -d '{"equation": "2*x + 4 = 10", "steps": true}'
+
+# Calculate 2x2 matrix determinant
+curl -X POST http://localhost:8000/api/v1/math/matrix/det \
+  -H "Content-Type: application/json" \
+  -d '{"matrix": "1, 2; 3, 4"}'
+
+# Normal distribution calculation
+curl -X POST http://localhost:8000/api/v1/math/stats/normal \
+  -H "Content-Type: application/json" \
+  -d '{"x": 1.96, "mu": 0, "sigma": 1}'
+
+# Generate practice question
+curl http://localhost:8000/api/v1/math/practice/question?topic=derivatives
+```
+
+---
+
 ## Python Library Usage
 
 MathStore is built as a modular Python library. You can import any analyzer, step generator, or quiz component directly into your scripts or Jupyter notebooks.
@@ -362,11 +447,19 @@ print("Score:", results["percentage"], "%")
 mathstore/
 ├── pyproject.toml              # Build & dependency configuration
 ├── README.md                   # Documentation & usage guide
+├── api/                        # Top-level API alias package
+│   ├── __init__.py
+│   └── main.py                 # uvicorn api.main:app entrypoint
 ├── src/mathstore/
 │   ├── __init__.py             # Public top-level exports
 │   ├── cli.py                  # Argparse CLI interface
 │   ├── algebra/
 │   │   └── solver.py           # Linear & polynomial equation solver
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── main.py             # FastAPI application & server runner
+│   │   ├── schemas.py          # Pydantic request & response models
+│   │   └── routes/             # Route modules (/api/v1/math)
 │   ├── calculus/
 │   │   └── analyzer.py         # Differentiation, integration, and limits
 │   ├── core/
@@ -378,8 +471,9 @@ mathstore/
 │   └── study/
 │       ├── steps.py            # Step-by-step derivation generators
 │       └── practice.py         # Active-recall quizzer & answer verification
-└── tests/                      # Pytest test suites (193 tests, 90% coverage)
+└── tests/                      # Pytest test suites (232 tests, 91% coverage)
     ├── test_algebra.py
+    ├── test_api.py
     ├── test_calculus.py
     ├── test_cli.py
     ├── test_matrix.py

@@ -8,12 +8,16 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.141.1",
     "numpy>=2.5.3",
+    "pydantic>=2.13.5",
     "sympy>=1.14.0",
+    "uvicorn[standard]>=0.53.0",
 ]
 
 [project.scripts]
 mathstore = "mathstore.cli:main"
+mathstore-server = "mathstore.api.main:run"
 
 [build-system]
 requires = ["uv_build>=0.12.6,<0.13.0"]
@@ -21,6 +25,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
 ]
