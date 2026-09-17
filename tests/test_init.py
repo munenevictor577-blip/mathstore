@@ -14,5 +14,8 @@ def test_init_exports():
     """Verify top-level package exports."""
     assert hasattr(mathstore, "EquationSolver")
     assert hasattr(mathstore, "CalculusAnalyzer")
+    assert hasattr(mathstore, "get_reference")
+    assert hasattr(mathstore, "list_topics")
     assert hasattr(mathstore, "main")
+
 

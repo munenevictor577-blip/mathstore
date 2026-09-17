@@ -150,3 +150,86 @@ class TestCLI:
         captured = capsys.readouterr()
         assert "Solution: x = [1]" in captured.out
 
+    def test_cli_solve_latex(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test solve subcommand with --latex flag."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "solve", "2*x + 4 = 10", "--latex"])
+        main()
+        captured = capsys.readouterr()
+        assert "x = 3" in captured.out
+
+    def test_cli_solve_pretty(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test solve subcommand with --pretty flag."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "solve", "2*x + 4 = 10", "--pretty"])
+        main()
+        captured = capsys.readouterr()
+        assert "x = 3" in captured.out
+
+    def test_cli_diff_latex_and_pretty(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test diff subcommand with --latex and --pretty flags."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "diff", "x**2", "--latex"])
+        main()
+        assert r"\frac{d}{d x}" in capsys.readouterr().out
+
+        monkeypatch.setattr(sys, "argv", ["mathstore", "diff", "x**2", "--pretty"])
+        main()
+        assert "dx" in capsys.readouterr().out
+
+    def test_cli_integrate_latex_and_pretty(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test integrate subcommand with --latex and --pretty flags."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "integrate", "x**2", "--latex"])
+        main()
+        assert r"\int" in capsys.readouterr().out
+
+        monkeypatch.setattr(sys, "argv", ["mathstore", "integrate", "x**2", "--pretty"])
+        main()
+        assert "⌠" in capsys.readouterr().out
+
+    def test_cli_limit_latex_and_pretty(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test limit subcommand with --latex and --pretty flags."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "limit", "sin(x)/x", "0", "--latex"])
+        main()
+        assert r"\lim" in capsys.readouterr().out
+
+        monkeypatch.setattr(sys, "argv", ["mathstore", "limit", "sin(x)/x", "0", "--pretty"])
+        main()
+        assert "lim" in capsys.readouterr().out
+
+    def test_cli_ref_list(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test ref subcommand listing topics."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "ref", "--list"])
+        main()
+        captured = capsys.readouterr()
+        assert "Available study reference topics:" in captured.out
+        assert "derivatives" in captured.out
+
+    def test_cli_ref_no_topic(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test ref subcommand with no topic defaults to listing topics."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "ref"])
+        main()
+        captured = capsys.readouterr()
+        assert "Available study reference topics:" in captured.out
+
+    def test_cli_ref_topic(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test ref subcommand showing a specific topic."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "ref", "derivatives"])
+        main()
+        captured = capsys.readouterr()
+        assert "=== Derivatives Reference Cheat Sheet ===" in captured.out
+
+    def test_cli_ref_topic_latex(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test ref subcommand showing a topic in LaTeX format."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "ref", "trig", "--latex"])
+        main()
+        captured = capsys.readouterr()
+        assert r"\section*{Trigonometric Identities Cheat Sheet}" in captured.out
+
+    def test_cli_ref_topic_error(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test ref subcommand with unknown topic."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "ref", "unknown_topic"])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "Unknown reference topic 'unknown_topic'" in captured.err
+
+

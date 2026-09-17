@@ -98,3 +98,44 @@ class TestCalculusAnalyzer:
         """Raise ValueError when expression syntax is invalid."""
         with pytest.raises(ValueError, match="Calculus error during limit calculation"):
             analyzer.get_limit("sin(", limits=0)
+
+    def test_differentiate_latex_and_pretty(self, analyzer: CalculusAnalyzer):
+        """Verify LaTeX and pretty Unicode formatting for derivatives."""
+        latex_res = analyzer.differentiate("x**2", format="latex")
+        assert r"\frac{d}{d x}" in latex_res
+        assert "2 x" in latex_res
+
+        pretty_res = analyzer.differentiate("x**2", format="pretty")
+        assert "dx" in pretty_res
+        assert "2⋅x" in pretty_res
+
+    def test_integrate_indefinite_latex_and_pretty(self, analyzer: CalculusAnalyzer):
+        """Verify LaTeX and pretty Unicode formatting for indefinite integrals."""
+        latex_res = analyzer.integrate("x**2", format="latex")
+        assert r"\int" in latex_res
+        assert r"\frac{x^{3}}{3}" in latex_res
+
+        pretty_res = analyzer.integrate("x**2", format="pretty")
+        assert "⌠" in pretty_res
+        assert "3" in pretty_res
+
+    def test_integrate_definite_latex_and_pretty(self, analyzer: CalculusAnalyzer):
+        """Verify LaTeX and pretty Unicode formatting for definite integrals."""
+        latex_res = analyzer.integrate("x", limits=(0, 2), format="latex")
+        assert r"\int" in latex_res
+        assert "2" in latex_res
+
+        pretty_res = analyzer.integrate("x", limits=(0, 2), format="pretty")
+        assert "⌠" in pretty_res
+        assert "2" in pretty_res
+
+    def test_get_limit_latex_and_pretty(self, analyzer: CalculusAnalyzer):
+        """Verify LaTeX and pretty Unicode formatting for limits."""
+        latex_res = analyzer.get_limit("sin(x)/x", limits=0, format="latex")
+        assert r"\lim" in latex_res
+        assert "1" in latex_res
+
+        pretty_res = analyzer.get_limit("sin(x)/x", limits=0, format="pretty")
+        assert "lim" in pretty_res
+        assert "1" in pretty_res
+

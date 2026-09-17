@@ -25,3 +25,30 @@ class EquationSolver:
             return str(sp.simplify(expr))
         except Exception as e:  # noqa: BLE001
             raise ValueError(f"Failed to parse or simplify the expression: {e}")
+
+    def format_solution(self, solutions: list, variable: str = "x", format: str = "str") -> str:
+        """
+        Formats equation solutions into standard text, LaTeX, or pretty Unicode.
+
+        Args:
+            solutions: List of solutions returned by solve_linear.
+            variable: The variable solved for (default: 'x').
+            format: Output format ('str', 'latex', or 'pretty').
+        """
+        if format == "latex":
+            if not solutions:
+                return r"\emptyset"
+            if len(solutions) == 1:
+                return f"{variable} = {sp.latex(solutions[0])}"
+            inner = ", ".join(sp.latex(s) for s in solutions)
+            return f"{variable} \\in \\left\\{{ {inner} \\right\\}}"
+
+        if format == "pretty":
+            if not solutions:
+                return "No solution (∅)"
+            if len(solutions) == 1:
+                return f"{variable} = {sp.pretty(solutions[0], use_unicode=True)}"
+            inner = ", ".join(sp.pretty(s, use_unicode=True) for s in solutions)
+            return f"{variable} ∈ {{{inner}}}"
+
+        return f"Solution: {variable} = {solutions}"
