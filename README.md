@@ -34,13 +34,15 @@
 ## Installation & Setup
 
 ### Prerequisites
+
 - Python 3.12 or newer
 - [`uv`](https://github.com/astral-sh/uv) (recommended) or `pip`
 
 ### Install with `uv`
+
 ```bash
 # Clone the repository
-git clone https://github.com/mark/mathstore.git
+git clone https://github.com/munenevictor577-blip/mathstore.git
 cd mathstore
 
 # Sync virtual environment and dependencies
@@ -51,6 +53,7 @@ uv run mathstore --help
 ```
 
 ### Install with `pip`
+
 ```bash
 pip install -e .
 mathstore --help
@@ -82,7 +85,8 @@ mathstore solve "2*x + 4 = 10" --steps
 mathstore solve "x**2 - 5*x + 6 = 0" --steps
 ```
 
-**Example output for `mathstore diff "x**2 * sin(x)" --steps`:**
+**Example output for `mathstore diff "x**2 \* sin(x)" --steps`:\*\*
+
 ```text
 Step-by-step differentiation of x**2 * sin(x):
   1. Apply Product Rule to (x**2*sin(x)): (u*v)' = u'*v + u*v' with u = x**2, v = sin(x)
@@ -103,6 +107,7 @@ Interactive quizzer designed for exam preparation and active revision with rando
 - **Smart Equivalence**: Accepts standard math inputs (`^` or `**`, `+ C`, arbitrary constants, permuted products, multi-root sets e.g. `2, 3` or `[2, 3]`).
 
 #### Interactive Mode
+
 ```bash
 # Launch interactive 5-question session across all topics
 mathstore practice
@@ -113,13 +118,16 @@ mathstore practice matrix --difficulty hard -n 3
 ```
 
 During an interactive quiz:
+
 - Type your mathematical answer (e.g. `6*x**2`, `x^2/2 + C`, `2, 3`)
 - Type `hint` for a formula clue
 - Type `skip` to reveal the answer and step-by-step derivation
 - Type `quit` to exit early with score summary
 
 #### Non-Interactive Generation (`--generate` / `-g`)
+
 Generate practice question cards with hints, answers, and solutions for problem sets or worksheets:
+
 ```bash
 # Generate 3 practice problems with full solutions
 mathstore practice --generate --topic algebra -n 3 --seed 42
@@ -151,18 +159,18 @@ mathstore limit "1/x" oo
 
 Perform matrix operations by passing row-separated strings (`"1, 2; 3, 4"` or `"[[1, 2], [3, 4]]"`):
 
-| Operation | Command Example | Description |
-|---|---|---|
-| `det` | `mathstore matrix det "1, 2; 3, 4"` | Determinant |
-| `inv` | `mathstore matrix inv "1, 2; 3, 4"` | Matrix Inverse |
-| `rref` | `mathstore matrix rref "1, 2, -1; 2, 4, 3"` | Reduced Row Echelon Form |
-| `eigen` | `mathstore matrix eigen "2, 0; 0, 3"` | Eigenvalues & algebraic multiplicities |
-| `eigenvects` | `mathstore matrix eigenvects "2, 0; 0, 3"` | Eigenvectors & eigenspaces |
-| `rank` | `mathstore matrix rank "1, 2; 2, 4"` | Matrix Rank |
-| `nullity` | `mathstore matrix nullity "1, 2; 2, 4"` | Dimension of null space |
-| `trace` | `mathstore matrix trace "5, 1; 2, 3"` | Sum of diagonal entries |
-| `transpose` | `mathstore matrix transpose "1, 2; 3, 4"` | Matrix Transpose |
-| `charpoly` | `mathstore matrix charpoly "1, 2; 3, 4"` | Characteristic polynomial $\det(\lambda I - A)$ |
+| Operation    | Command Example                             | Description                                     |
+| ------------ | ------------------------------------------- | ----------------------------------------------- |
+| `det`        | `mathstore matrix det "1, 2; 3, 4"`         | Determinant                                     |
+| `inv`        | `mathstore matrix inv "1, 2; 3, 4"`         | Matrix Inverse                                  |
+| `rref`       | `mathstore matrix rref "1, 2, -1; 2, 4, 3"` | Reduced Row Echelon Form                        |
+| `eigen`      | `mathstore matrix eigen "2, 0; 0, 3"`       | Eigenvalues & algebraic multiplicities          |
+| `eigenvects` | `mathstore matrix eigenvects "2, 0; 0, 3"`  | Eigenvectors & eigenspaces                      |
+| `rank`       | `mathstore matrix rank "1, 2; 2, 4"`        | Matrix Rank                                     |
+| `nullity`    | `mathstore matrix nullity "1, 2; 2, 4"`     | Dimension of null space                         |
+| `trace`      | `mathstore matrix trace "5, 1; 2, 3"`       | Sum of diagonal entries                         |
+| `transpose`  | `mathstore matrix transpose "1, 2; 3, 4"`   | Matrix Transpose                                |
+| `charpoly`   | `mathstore matrix charpoly "1, 2; 3, 4"`    | Characteristic polynomial $\det(\lambda I - A)$ |
 
 ---
 
