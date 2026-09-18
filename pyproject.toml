@@ -1,12 +1,12 @@
 [project]
 name = "mathstore"
 version = "0.1.0"
-description = "Add your description here"
+description = "A clean, modular mathematical toolkit."
 readme = "README.md"
 authors = [
-    { name = "mark", email = "pythondev677@gmail.com" }
+    { name = "mark", email = "munenevictor577@gmail.com" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.141.1",
     "numpy>=2.5.3",
