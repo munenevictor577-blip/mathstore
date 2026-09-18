@@ -23,7 +23,7 @@ def create_app() -> FastAPI:
             "linear algebra, probability, statistics, reference cheat sheets, and active-recall practice."
         ),
         version="0.1.0",
-        docs_url="/docs",
+        docs_url="/api/v1/math/docs",
         redoc_url="/redoc",
     )
 
@@ -67,7 +67,7 @@ def create_app() -> FastAPI:
             "description": "Mathematical Toolkit API for university study and revision",
             "version": "0.1.0",
             "prefix": "/api/v1/math",
-            "docs_url": "/docs",
+            "docs_url": "/api/v1/math/docs",
             "redoc_url": "/redoc",
             "health_url": "/api/v1/math/health",
         }
