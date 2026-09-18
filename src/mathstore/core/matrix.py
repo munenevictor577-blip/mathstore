@@ -1,9 +1,12 @@
 """Linear algebra and matrix analysis toolkit for university mathematics."""
 
 import ast
+import re
 from typing import Any
 
 import sympy as sp
+
+from mathstore.core.safe import safe_sympify
 
 
 class MatrixAnalyzer:
@@ -50,6 +53,28 @@ class MatrixAnalyzer:
                 except Exception:  # noqa: BLE001, S110
                     pass
 
+                # If ast.literal_eval fails (e.g. symbolic variables), parse row lists
+                try:
+                    inner = raw[1:-1].strip()
+                    row_matches = re.findall(r"\[([^\]]+)\]", inner)
+                    if row_matches:
+                        data = []
+                        for row_str in row_matches:
+                            items = [
+                                safe_sympify(part.strip())
+                                for part in row_str.split(",")
+                                if part.strip()
+                            ]
+                            if not items:
+                                raise ValueError("Encountered an empty row in matrix input.")
+                            data.append(items)
+                        mat = sp.Matrix(data)
+                        if mat.rows == 0 or mat.cols == 0:
+                            raise ValueError("Matrix cannot be empty.")
+                        return mat
+                except Exception:  # noqa: BLE001, S110
+                    pass
+
             # Try parsing semicolon-separated row format: "1, 2; 3, 4" or "1 2; 3 4"
             try:
                 row_strs = [r.strip() for r in raw.split(";") if r.strip()]
@@ -59,7 +84,7 @@ class MatrixAnalyzer:
                 data = []
                 for row_str in row_strs:
                     items = [
-                        sp.sympify(part.strip())
+                        safe_sympify(part.strip())
                         for part in row_str.replace(",", " ").split()
                         if part.strip()
                     ]
