@@ -260,8 +260,13 @@ class StatsAnalyzer:
         t_dist = StudentT("T", df)
         t_cdf = cdf(t_dist)
 
-        low, high = 0.0, 50.0
-        for _ in range(35):
+        low = 0.0
+        high = 10.0
+        while float(t_cdf(high)) < target_p and high < 1e6:
+            low = high
+            high *= 4.0
+
+        for _ in range(40):
             mid = (low + high) / 2.0
             val = float(t_cdf(mid))
             if val < target_p:
@@ -335,7 +340,16 @@ class StatsAnalyzer:
         s = self.std_dev(data)
         df = n - 1
         se = s / math.sqrt(n)
-        t_stat = (m - pop_mean) / se if se > 0 else 0.0
+        if se == 0:
+            if m == pop_mean:
+                t_stat = 0.0
+            else:
+                raise ValueError(
+                    "Sample variance is zero, but sample mean differs from hypothesized population mean; "
+                    "t-statistic cannot be computed."
+                )
+        else:
+            t_stat = (m - pop_mean) / se
 
         t_dist = StudentT("T", df)
         t_cdf = cdf(t_dist)
