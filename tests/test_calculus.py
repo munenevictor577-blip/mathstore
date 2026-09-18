@@ -139,3 +139,40 @@ class TestCalculusAnalyzer:
         assert "lim" in pretty_res
         assert "1" in pretty_res
 
+    def test_natural_text_2_pow_x_sin_x(self, analyzer: CalculusAnalyzer):
+        """Verify parsing and differentiation of normal text '2^x sin x'."""
+        diff_res = analyzer.differentiate("2^x sin x")
+        assert "2**x" in diff_res
+        assert "sin(x)" in diff_res
+        assert "cos(x)" in diff_res
+        assert "log(2)" in diff_res
+
+        int_res = analyzer.integrate("2^x sin x")
+        assert "2**x" in int_res
+        assert "sin(x)" in int_res
+        assert "cos(x)" in int_res
+
+        lim_res = analyzer.get_limit("2^x sin x", limits=0)
+        assert lim_res == "0"
+
+    def test_natural_text_implicit_multiplication_and_powers(self, analyzer: CalculusAnalyzer):
+        """Verify normal text with implicit multiplication, caret powers, and e^x."""
+        assert analyzer.differentiate("2x + 4") == "2"
+        assert analyzer.differentiate("x^2") == "2*x"
+        assert analyzer.differentiate("3x^2 + 5x - 7") == "6*x + 5"
+        assert analyzer.differentiate("e^x") == "exp(x)"
+        assert analyzer.differentiate("sin^2 x") == "2*sin(x)*cos(x)"
+        assert analyzer.get_limit("sin x / x", limits=0) == "1"
+
+    def test_natural_text_trailing_differential(self, analyzer: CalculusAnalyzer):
+        """Verify handling of trailing differential 'dx'."""
+        assert analyzer.integrate("2x dx") == "x**2"
+        assert "2**x" in analyzer.integrate("2^x sin x dx")
+
+    def test_parse_expression_method(self, analyzer: CalculusAnalyzer):
+        """Verify the parse_expression helper method."""
+        expr = analyzer.parse_expression("2^x sin x")
+        assert expr == sp.sympify("2**x * sin(x)")
+        expr2 = analyzer.parse_expression("e^(2x)")
+        assert expr2 == sp.exp(2 * sp.Symbol("x"))
+
