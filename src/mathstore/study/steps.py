@@ -1,6 +1,8 @@
 import sympy as sp
 from sympy.integrals.manualintegrate import integral_steps
 
+from mathstore.core.safe import safe_sympify
+
 
 class DerivativeStepGenerator:
     """Generates human-readable, pedagogical step-by-step differentiation derivations."""
@@ -11,8 +13,10 @@ class DerivativeStepGenerator:
 
     def explain(self, expr_str: str, order: int = 1) -> list[str]:
         """Explains the differentiation of an expression up to the requested order."""
+        if order < 1:
+            raise ValueError(f"Derivative order must be at least 1 (got {order}).")
         try:
-            curr = sp.sympify(expr_str)
+            curr = safe_sympify(expr_str)
         except Exception as e:  # noqa: BLE001
             raise ValueError(f"Could not parse expression '{expr_str}': {e}")
 
@@ -244,7 +248,7 @@ def get_integral_steps(
     """Returns step-by-step breakdown of an indefinite or definite integral."""
     try:
         var = sp.Symbol(variable)
-        expr = sp.sympify(expression_str)
+        expr = safe_sympify(expression_str)
     except Exception as e:  # noqa: BLE001
         raise ValueError(f"Could not parse integral expression '{expression_str}': {e}")
 
@@ -286,8 +290,8 @@ def get_equation_steps(equation_str: str, variable: str = "x") -> list[str]:
     var = sp.Symbol(variable)
     lhs_str, rhs_str = equation_str.split("=", 1)
     try:
-        lhs = sp.sympify(lhs_str.strip())
-        rhs = sp.sympify(rhs_str.strip())
+        lhs = safe_sympify(lhs_str.strip())
+        rhs = safe_sympify(rhs_str.strip())
     except Exception as e:  # noqa: BLE001
         raise ValueError(f"Could not parse equation '{equation_str}': {e}")
 
@@ -324,12 +328,15 @@ def get_equation_steps(equation_str: str, variable: str = "x") -> list[str]:
             steps.append(
                 f"Calculate discriminant: Δ = b^2 - 4ac = ({b})^2 - 4*({a})*({c}) = {disc}"
             )
-            if disc > 0:
-                steps.append("Δ > 0: Equation has two distinct real roots.")
-            elif disc == 0:
-                steps.append("Δ = 0: Equation has one repeated real root.")
+            if getattr(disc, "is_number", False) and disc.is_real:
+                if disc > 0:
+                    steps.append("Δ > 0: Equation has two distinct real roots.")
+                elif disc == 0:
+                    steps.append("Δ = 0: Equation has one repeated real root.")
+                else:
+                    steps.append("Δ < 0: Equation has two complex conjugate roots.")
             else:
-                steps.append("Δ < 0: Equation has two complex conjugate roots.")
+                steps.append(f"Sign of discriminant Δ = {disc} depends on parameter values.")
             steps.append(f"Apply quadratic formula: {variable} = (-b ± √Δ) / (2a)")
             sols = sp.solve(diff_expr, var)
             steps.append(f"Solutions: {variable} = {sols}")

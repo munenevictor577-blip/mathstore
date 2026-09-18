@@ -6,6 +6,7 @@ from typing import Any
 
 import sympy as sp
 
+from mathstore.core.safe import safe_sympify
 from mathstore.study.steps import (
     get_derivative_steps,
     get_equation_steps,
@@ -96,13 +97,28 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
             if not parts:
                 return False, "Could not identify any roots in your answer."
             user_roots = {
-                sp.sympify(
+                safe_sympify(
                     _normalize_input_str(p),
-                    locals={"sqrt": sp.sqrt, "I": sp.I, "pi": sp.pi, "E": sp.E},
+                    locals_dict={"sqrt": sp.sqrt, "I": sp.I, "pi": sp.pi, "E": sp.E},
                 )
                 for p in parts
             }
-            correct_roots = set(question.correct_value)
+            if question.correct_value is not None:
+                if isinstance(question.correct_value, (list, tuple, set)):
+                    raw_correct = list(question.correct_value)
+                else:
+                    raw_correct = [question.correct_value]
+            else:
+                ans_cleaned = re.sub(r"[a-zA-Z]\s*=\s*", "", question.expected_answer).strip("[]{}()")
+                raw_correct = [p.strip() for p in ans_cleaned.split(",") if p.strip()]
+
+            correct_roots = {
+                safe_sympify(
+                    _normalize_input_str(str(r)),
+                    locals_dict={"sqrt": sp.sqrt, "I": sp.I, "pi": sp.pi, "E": sp.E},
+                )
+                for r in raw_correct
+            }
             if user_roots == correct_roots:
                 return True, "✓ Correct! All roots match."
             return (
@@ -115,8 +131,9 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
     if q_type == "number":
         try:
             norm = _normalize_input_str(raw)
-            val = float(sp.sympify(norm))
-            target = float(question.correct_value)
+            val = float(safe_sympify(norm))
+            target_raw = question.correct_value if question.correct_value is not None else question.expected_answer
+            target = float(safe_sympify(_normalize_input_str(str(target_raw))))
             if abs(val - target) <= question.tolerance:
                 return True, "✓ Correct!"
             return False, f"Numerical value is incorrect (got {val:.4f}). Try again or type 'hint'."
@@ -128,11 +145,17 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
             norm = _normalize_input_str(raw)
             c_sym = sp.Symbol("C")
             c_lower = sp.Symbol("c")
-            user_expr = sp.sympify(norm, locals={"C": c_sym, "c": c_lower})
+            user_expr = safe_sympify(norm, locals_dict={"C": c_sym, "c": c_lower})
             var = sp.Symbol(question.variable)
 
+            target_raw = question.correct_value if question.correct_value is not None else question.expected_answer
+            if isinstance(target_raw, str):
+                target_norm = re.sub(r"\s*\+\s*[cC]$", "", target_raw.strip())
+            else:
+                target_norm = str(target_raw)
+
             if question.is_definite:
-                target = sp.sympify(question.correct_value)
+                target = safe_sympify(target_norm)
                 if sp.simplify(user_expr - target) == 0:
                     return True, "✓ Correct!"
                 try:
@@ -143,7 +166,7 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
                 return False, "Calculated definite integral is incorrect. Try again or type 'hint'."
 
             # Indefinite integral: derivative of difference with respect to var must be 0
-            target_expr = sp.sympify(question.correct_value)
+            target_expr = safe_sympify(target_norm, locals_dict={"C": c_sym, "c": c_lower})
             diff_wrt_var = sp.diff(user_expr - target_expr, var)
             if sp.simplify(diff_wrt_var) == 0:
                 return True, "✓ Correct! (Antiderivative is equivalent up to an additive constant)"
@@ -154,8 +177,9 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
     if q_type in ("derivative", "symbolic"):
         try:
             norm = _normalize_input_str(raw)
-            user_expr = sp.sympify(norm)
-            target = sp.sympify(question.correct_value)
+            user_expr = safe_sympify(norm)
+            target_raw = question.correct_value if question.correct_value is not None else question.expected_answer
+            target = safe_sympify(str(target_raw))
             if sp.simplify(user_expr - target) == 0:
                 return True, "✓ Correct!"
             return False, "Expression does not match. Try again or type 'hint'."

@@ -138,6 +138,54 @@ class TTestRequest(BaseModel):
     format: str = Field("str", description="Output format: 'str', 'latex', or 'pretty'")
 
 
+class StatsSummaryResponse(BaseModel):
+    data: str | list[float]
+    format: str
+    summary: dict[str, float] | str
+
+
+class NormalResponse(BaseModel):
+    x: float
+    mu: float
+    sigma: float
+    z_score: float
+    pdf: float
+    cdf: float
+
+
+class BinomialResponse(BaseModel):
+    k: int
+    n: int
+    p: float
+    pmf: float
+    cdf: float
+
+
+class PoissonResponse(BaseModel):
+    k: int
+    lambda_: float = Field(..., serialization_alias="lambda", alias="lambda")
+    pmf: float
+    cdf: float
+
+    model_config = {"populate_by_name": True}
+
+
+class ConfidenceIntervalResponse(BaseModel):
+    confidence: float
+    lower_bound: float | None = None
+    upper_bound: float | None = None
+    margin_of_error: float | None = None
+    result: str | None = None
+    format: str
+
+
+class TTestResponse(BaseModel):
+    pop_mean: float
+    alternative: str
+    result: dict[str, float] | str
+    format: str
+
+
 # --- Step Breakdown Schemas ---
 class DerivativeStepsRequest(BaseModel):
     expression: str = Field(..., description="Expression to differentiate")

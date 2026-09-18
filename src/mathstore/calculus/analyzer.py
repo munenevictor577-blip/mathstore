@@ -1,5 +1,7 @@
 import sympy as sp
 
+from mathstore.core.safe import safe_sympify
+
 
 class CalculusAnalyzer:
     """Handles differentiation and integration, shielding user from Sympy internals."""
@@ -21,7 +23,7 @@ class CalculusAnalyzer:
         """
         try:
             var = sp.Symbol(variable)
-            expr = sp.sympify(expression_str)
+            expr = safe_sympify(expression_str)
             result = sp.diff(expr, var, order)
             if format == 'latex':
                 return sp.latex(sp.Eq(sp.Derivative(expr, var, order), result, evaluate=False))
@@ -52,7 +54,7 @@ class CalculusAnalyzer:
         """
         try:
             var = sp.Symbol(variable)
-            expr = sp.sympify(expression_str)
+            expr = safe_sympify(expression_str)
 
             if limits is not None:
                 lower, upper = limits
@@ -98,8 +100,8 @@ class CalculusAnalyzer:
         """
         try:
             var = sp.Symbol(variable)
-            expr = sp.sympify(expression_str)
-            target = sp.sympify(limits)
+            expr = safe_sympify(expression_str)
+            target = safe_sympify(limits)
             result = sp.limit(expr, var, target)
             if format == 'latex':
                 return sp.latex(sp.Eq(sp.Limit(expr, var, target), result, evaluate=False))
