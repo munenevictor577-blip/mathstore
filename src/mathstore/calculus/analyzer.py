@@ -9,21 +9,30 @@ class CalculusAnalyzer:
     def __init__(self):
         self.x, self.y, self.z, self.t = sp.symbols('x y z t')
 
+    def parse_expression(self, expression_str: str, variable: str = 'x') -> sp.Basic:
+        """
+        Parses a mathematical expression string into a SymPy expression object.
+        Supports standard syntax and natural mathematical text like '2^x sin x',
+        '2x + 4', 'x^2', 'e^x', 'sin^2 x', and 'ln x'.
+        """
+        return safe_sympify(expression_str, variable=variable)
+
     def differentiate(
         self, expression_str: str, variable: str = 'x', order: int = 1, format: str = 'str'
     ) -> str:
         """
         Calculates the nth derivative of an algebraic expression.
+        Supports normal text like '2^x sin x', '2x + 4', 'x^2', 'e^x', etc.
 
         Args:
-            expression_str: The mathematical expression (e.g. 'sin(x) * exp(x)')
+            expression_str: The mathematical expression (e.g. '2^x sin x' or 'sin(x) * exp(x)')
             variable: The variable to differentiate with respect to (default: 'x')
             order: The degree of the derivative (default: 1)
             format: Output format ('str', 'latex', or 'pretty')
         """
         try:
             var = sp.Symbol(variable)
-            expr = safe_sympify(expression_str)
+            expr = self.parse_expression(expression_str, variable=variable)
             result = sp.diff(expr, var, order)
             if format == 'latex':
                 return sp.latex(sp.Eq(sp.Derivative(expr, var, order), result, evaluate=False))
@@ -45,6 +54,7 @@ class CalculusAnalyzer:
     ) -> str:
         """
         Calculates either the indefinite or definite integral.
+        Supports normal text like '2^x sin x', '2x dx', 'x^2', 'e^x', etc.
 
         Args:
             expression_str: The mathematical expression to integrate.
@@ -54,7 +64,7 @@ class CalculusAnalyzer:
         """
         try:
             var = sp.Symbol(variable)
-            expr = safe_sympify(expression_str)
+            expr = self.parse_expression(expression_str, variable=variable)
 
             if limits is not None:
                 lower, upper = limits
@@ -91,6 +101,7 @@ class CalculusAnalyzer:
     ) -> str:
         """
         Calculates the limit of a mathematical expression.
+        Supports normal text like 'sin x / x', '2^x sin x', etc.
 
         Args:
             expression_str: The mathematical expression.
@@ -100,8 +111,8 @@ class CalculusAnalyzer:
         """
         try:
             var = sp.Symbol(variable)
-            expr = safe_sympify(expression_str)
-            target = safe_sympify(limits)
+            expr = self.parse_expression(expression_str, variable=variable)
+            target = safe_sympify(limits, variable=variable)
             result = sp.limit(expr, var, target)
             if format == 'latex':
                 return sp.latex(sp.Eq(sp.Limit(expr, var, target), result, evaluate=False))
