@@ -1,4 +1,4 @@
-name: Deploy to GCP
+name: Deploy Mathstore to GCP
 
 on:
   push:
@@ -16,11 +16,17 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
           script: |
-            cd ~/mathstore
+            cd /srv/apps/mathstore
 
+            # 1. Force sync with the remote server branch
             git fetch --all
             git reset --hard origin/server
             git pull origin server
 
+            # 2. Sync dependencies using uv
+            ~/.local/bin/uv sync
+
+            # 3. Restart the background service
             sudo systemctl restart mathstore
