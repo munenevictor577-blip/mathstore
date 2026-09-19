@@ -41,7 +41,6 @@ def create_app() -> FastAPI:
     # Core math router with prefix: /math
     math_router = APIRouter()
 
-    @math_router.get("", summary="Math API Index", include_in_schema=False)
     @math_router.get("/", summary="Math API Index")
     def math_root() -> dict[str, Any]:
         """Root API metadata index for the Math API prefix."""
