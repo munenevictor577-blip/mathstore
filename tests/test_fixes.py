@@ -163,7 +163,7 @@ class TestAPIStatisticsResponseSchemas:
 
     def test_stats_summary_response(self):
         client = TestClient(app)
-        res = client.post("/api/v1/math/stats/summary", json={"data": "10, 12, 14", "format": "str"})
+        res = client.post("/math/stats/summary", json={"data": "10, 12, 14", "format": "str"})
         assert res.status_code == 200
         data = res.json()
         assert "data" in data
@@ -171,7 +171,7 @@ class TestAPIStatisticsResponseSchemas:
 
     def test_stats_poisson_response_model(self):
         client = TestClient(app)
-        res = client.post("/api/v1/math/stats/poisson", json={"k": 2, "lam": 3.0})
+        res = client.post("/math/stats/poisson", json={"k": 2, "lam": 3.0})
         assert res.status_code == 200
         data = res.json()
         assert data["k"] == 2

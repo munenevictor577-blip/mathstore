@@ -1,0 +1,587 @@
+# MathStore: Architecture, Technical Implementation, Usage Guide & Future Roadmap
+
+---
+
+## 1. Executive Summary: What MathStore Does
+
+**MathStore** is a modular, high-performance mathematical toolkit, interactive Command-Line Interface (CLI), and production-ready REST API built with Python 3.12, SymPy, and FastAPI. Designed specifically for university STEM students, educators, academic researchers, and EdTech platforms, MathStore bridges the gap between raw computer algebra systems (CAS) and pedagogical learning environments.
+
+Rather than merely outputting raw answers like a typical calculator, MathStore focuses on **derivation transparency**, **pedagogical explanation**, **interactive active-recall learning**, and **multi-channel accessibility** (terminal CLI, Python library, and HTTP REST microservice).
+
+### Core Functional Capabilities
+
+| Capability Domain | Description & Scope | Key Capabilities |
+|---|---|---|
+| **Symbolic Calculus** | Analytical computation of continuous functions | Single and higher-order derivatives, definite and indefinite integrals, finite, infinite, and one-sided limits. Accepts standard syntax and natural math text (e.g., `2^x sin x`, `2x + 4`, `sin^2 x`). |
+| **Step-by-Step Derivations** | Pedagogical breakdown of mathematical operations | Detailed human-readable derivation trees identifying explicit rules: Sum/Difference, Constant Factor, Power, Product, Quotient, and Chain rules; Integration by substitution, by parts, and trigonometric substitutions; FTC evaluation. |
+| **Algebraic Equation Solving** | Symbolic equation manipulation and root finding | Linear and polynomial equation solving, step-by-step algebraic isolation, expression simplification, and set-notation solution formatting ($x \in \{a, b\}$). |
+| **Linear Algebra** | Vector space and matrix transformations | Determinant calculation, matrix inversion, Reduced Row Echelon Form (RREF) with pivot tracking, eigenvalues with algebraic multiplicities, eigenspace bases with geometric multiplicities, rank, nullity, trace, and characteristic polynomials. |
+| **Probability & Statistics** | Descriptive summaries, distributions & inference | Five-number summary ($n$, mean, std dev, variance, min, $Q_1$, median, $Q_3$, max, IQR), PDF/CDF/z-scores for Normal distributions, PMF/CDF for Binomial and Poisson distributions, Student's $t$ confidence intervals, and one-sample Student's $t$-tests. |
+| **Formula Reference System** | Terminal cheat sheets for high-yield formulas | Quick-reference cheat sheets for differentiation, integration, trigonometric identities, limits, and series expansions, with optional LaTeX code generation. |
+| **Active-Recall Practice Quizzer** | Gamified revision and skill assessment | Procedural generation of randomized problem cards across all math domains, customizable difficulty (`easy`, `medium`, `hard`), formula hints, and smart symbolic equivalence verification. |
+| **Multi-Format Export Engine** | Academic presentation formatting | Instant formatting into standard string representations (`str`), publication-quality LaTeX markup (`latex`), and Unicode mathematical typography (`pretty`). |
+| **REST API Microservice** | Production-ready HTTP API under `/math` | Full FastAPI application with OpenAPI documentation remapped to `/math/docs`, ReDoc at `/math/redoc`, OpenAPI schema at `/math/openapi.json`, CORS middleware, strict Pydantic schemas, and structured error handling. |
+
+---
+
+## 2. Technical Deep-Dive: How MathStore Does It
+
+MathStore is engineered as a decoupled, layered system where core mathematical routines are insulated from parsing logic, presentation formatters, CLI entry points, and HTTP network transport.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                          User Entry Points                             │
+├──────────────────────────┬─────────────────────────┬───────────────────┤
+│  Command-Line Interface  │     FastAPI Server      │  Python Library   │
+│   (mathstore CLI / uv)   │   (/math/docs)   │ (import mathstore)│
+└────────────┬─────────────┴────────────┬────────────┴──────────┬────────┘
+             │                          │                       │
+             ▼                          ▼                       ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Parsing & Security Layer                        │
+│                 mathstore.core.safe.safe_sympify                       │
+│    • AST Injection Protection       • Implicit Multiplication (2x)     │
+│    • Forbidden Token Filtering      • Exponentiation Mapping (x^2)     │
+│    • Normalization (·, ×, |x|)      • Function Exponentiation (sin^2 x)│
+└───────────────────────────────────────┬────────────────────────────────┘
+                                        │
+                                        ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       Domain Engines & Analyzers                       │
+├─────────────────────┬─────────────────────┬────────────────────────────┤
+│  CalculusAnalyzer   │   EquationSolver    │       MatrixAnalyzer       │
+│  (Diff, Int, Limit) │ (Eq, Solve, Reduce) │   (RREF, Det, Eigenspaces) │
+├─────────────────────┴─────────────────────┴────────────────────────────┤
+│           StatsAnalyzer           │       ReferenceEngine              │
+│    (Descriptive, Dist, t-test)    │   (Formulas, Cheat Sheets)         │
+└───────────────────────────────────────┬────────────────────────────────┘
+                                        │
+                                        ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       Study & Pedagogical Engine                       │
+├─────────────────────────────────────────┬──────────────────────────────┤
+│          Step Generators                │   Active-Recall Practice     │
+│  • DerivativeStepGenerator              │ • Procedural Problem Creator │
+│  • IntegralStepGenerator                │ • Smart Equivalence Checker  │
+│  • EquationStepGenerator                │ • Interactive Quiz Session   │
+└─────────────────────────────────────────┴──────────────────────────────┘
+```
+
+### 2.1 The Safe Parsing Pipeline (`mathstore.core.safe`)
+
+Mathematical input submitted through a web API or CLI is inherently untrusted. Calling naive evaluation functions (`eval()` or raw `sympy.sympify()`) introduces critical Remote Code Execution (RCE) vulnerabilities. MathStore implements a defensive multi-stage sanitizer and parser in `safe_sympify`:
+
+1. **Security Guard & Token Filtering**:
+   - Matches incoming strings against `DANGEROUS_PATTERNS` regex to block dunder attributes (`__`), system imports, builtins, and code execution constructs:
+     ```python
+     r"__"
+     r"\b(?:import|eval|exec|compile|open|builtins|globals|locals|getattr|setattr|delattr|breakpoint|subprocess|os|sys|shutil)\b"
+     ```
+2. **Mathematical Normalization**:
+   - Replaces typographic multiplication symbols (`·`, `×`) with standard asterisks `*`.
+   - Normalizes absolute value bars (e.g., `|x + 1|` converted to `Abs(x + 1)`).
+   - Strips trailing differential notation (e.g., `2x dx` or `cos(t) dt` converted to clean integrand strings).
+3. **AST Token Transformation**:
+   - Parses the cleaned string through `sympy.parsing.sympy_parser.parse_expr` using `CALCULUS_TRANSFORMATIONS`:
+     - `standard_transformations`: Core Python grammar adjustments for math.
+     - `convert_xor`: Converts `^` into Python's exponentiation operator `**`.
+     - `implicit_multiplication_application`: Interprets `2x` as `2*x`, `2^x sin x` as `2**x * sin(x)`, and `x(x+1)` as `x*(x+1)`.
+     - `function_exponentiation`: Interprets mathematical shorthand like `sin^2 x` as `sin(x)**2`.
+4. **Namespace Pinning**:
+   - Pins mathematical constants (`pi`, imaginary unit `I`, Euler's number `e`/`E`) while allowing the user to specify custom variable contexts without variable collisions.
+
+### 2.2 Calculus & Analytical Machinery (`mathstore.calculus`)
+
+The `CalculusAnalyzer` class wraps SymPy's calculus routines while handling error propagation and presentation transformations:
+- **Differentiation**: Evaluates arbitrary $n$-th order derivatives (`sp.diff(expr, var, order)`).
+- **Integration**: Computes both indefinite integrals ($\int f(x) \, dx$) and definite integrals with limits ($\int_a^b f(x) \, dx$), returning expressions with clean integration limits.
+- **Limits**: Evaluates directional and infinite limits (`sp.limit(expr, var, target)`), accepting target strings such as `0`, `oo`, `-oo`.
+- **Output Multi-Formatting**: Formats results dynamically using SymPy's `latex()` or `pretty()` unicode printer when requested.
+
+### 2.3 Step-by-Step Pedagogical Generation (`mathstore.study.steps`)
+
+Unlike black-box CAS solvers, MathStore decomposes computations into step-by-step instructional proofs:
+- **`DerivativeStepGenerator`**:
+  - Traverses the SymPy expression tree (`Add`, `Mul`, `Pow`, trigonometric, exponential, logarithmic nodes).
+  - Recursively applies:
+    - **Sum Rule**: Splits addition nodes and differentiates each term individually.
+    - **Constant Multiple Rule**: Factors out numerical coefficients before evaluating derivatives.
+    - **Product Rule**: Identifies factors $u$ and $v$, computes $u'$ and $v'$, and constructs $(u'v + uv')$.
+    - **Quotient Rule**: Identifies numerator $u$ and denominator $v$, generating $\frac{u'v - uv'}{v^2}$.
+    - **Chain Rule & Generalized Power Rule**: Differentiates outer composite functions multiplied by inner derivatives.
+- **`IntegralStepGenerator`**:
+  - Leverages SymPy's internal `manualintegrate` rule trees.
+  - Generates clear step records for Integration by Parts ($\int u \, dv = uv - \int v \, du$), $u$-substitutions, standard trigonometric identities, and polynomial power rules.
+  - For definite integrals, computes the antiderivative $F(x)$, evaluates upper and lower bounds $F(b) - F(a)$, and states the final result via the Fundamental Theorem of Calculus.
+- **`EquationStepGenerator`**:
+  - Isolates terms containing the target variable on the left-hand side, shifts constant terms to the right-hand side, normalizes coefficients, and provides quadratic formula expansions ($x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$) with explicit discriminant evaluation.
+
+### 2.4 Linear Algebra & Matrix Engine (`mathstore.core.matrix`)
+
+The `MatrixAnalyzer` handles linear transformations and structural computations:
+- **Flexible Matrix Parsing**: Ingests matrices from Python nested lists (`[[1, 2], [3, 4]]`), stringified arrays, or MATLAB-style semicolon row notation (`"1, 2; 3, 4"` or `"1 2; 3 4"`).
+- **Reduced Row Echelon Form (RREF)**: Performs Gauss-Jordan elimination, identifying both the echelon matrix and the exact column pivot indices.
+- **Eigensystem Decomposition**: Computes exact eigenvalues, their algebraic multiplicities, and the corresponding eigenspace spanning basis vectors.
+- **Rank-Nullity Verification**: Computes row/column rank and nullity, confirming the Rank-Nullity Theorem ($\text{rank}(A) + \text{nullity}(A) = n$).
+
+### 2.5 Probability, Statistics & Inference (`mathstore.statistics`)
+
+The `StatsAnalyzer` provides descriptive and inferential statistics:
+- **Descriptive Statistics**: Sample mean, median, mode, sample variance ($n-1$), population variance ($n$), standard deviation, quartiles ($Q_1, Q_3$), and Interquartile Range (IQR) computed via linear rank interpolation.
+- **Probability Distributions**:
+  - **Normal**: Probability Density Function (PDF), Cumulative Distribution Function (CDF using Gauss's error function `math.erf`), and standardized $z$-scores.
+  - **Binomial**: Probability Mass Function (PMF) using exact combinations `math.comb(n, k)`, and cumulative distribution functions.
+  - **Poisson**: PMF and CDF using exact factorials and exponential decay calculations.
+- **Inferential Statistics**:
+  - **Student's $t$ Confidence Intervals**: Computes critical values $t^*$ using a bisection root-finding algorithm over SymPy's Student's $t$ CDF (`_t_critical`), yielding exact margin of error ($E = t^* \frac{s}{\sqrt{n}}$) and interval bounds.
+  - **One-Sample $t$-Test**: Calculates sample standard error, $t$-statistic ($t = \frac{\bar{x} - \mu_0}{s / \sqrt{n}}$), degrees of freedom ($df = n-1$), and exact $p$-values for two-sided, greater, and less alternative hypotheses.
+
+### 2.6 Active-Recall Practice & Equivalence Verification (`mathstore.study.practice`)
+
+The practice quizzer combines procedural question synthesis with intelligent answer checking:
+- **Procedural Question Generation**:
+  - Generates random problems across five canonical topics (`derivatives`, `integrals`, `algebra`, `matrix`, `stats`) and three difficulty tiers (`easy`, `medium`, `hard`).
+  - Supports deterministic seeding via `--seed` for reproducible exam and problem set generation.
+- **Symbolic Equivalence Verification (`check_answer`)**:
+  - Students enter mathematical answers in diverse notations (e.g. `2*x*cos(x) + 2*sin(x)`, `2(sin x + x cos x)`, `2x cos x + 2 sin x`).
+  - The verification algorithm normalizes input, strips arbitrary constants ($+ C$), and tests algebraic equivalence using SymPy:
+    $$\text{is\_correct} \iff \text{sp.simplify}(\text{user\_expr} - \text{expected\_expr}) = 0$$
+  - Handles set-based unordered root comparisons for polynomials (e.g. `2, 3` is recognized as equivalent to `3, 2` or `[2, 3]`).
+  - Supports float tolerance ($\pm 10^{-2}$) for numeric outputs.
+
+### 2.7 Production REST API Architecture (`mathstore.api`)
+
+The HTTP server is built with FastAPI and organized into clean route modules:
+- **Application Factory (`create_app`)**: Assembles sub-routers (`calculus`, `algebra`, `matrix`, `statistics`, `study`) under the unified prefix `/math`.
+- **Complete Route Routing Through `/math`**:
+  - Interactive Swagger UI: `/math/docs`
+  - ReDoc Documentation: `/math/redoc`
+  - OpenAPI Schema: `/math/openapi.json`
+  - OAuth2 Redirect: `/math/docs/oauth2-redirect`
+  - API Metadata Index: `/math` and `/math/`
+  - Health Check: `/math/health`
+- **Strict Pydantic Validation**: All requests and responses are strictly validated through Pydantic v2 schemas in `src/mathstore/api/schemas.py`.
+- **CORS Support**: Out-of-the-box cross-origin resource sharing middleware enabled for seamless frontend integration.
+
+---
+
+## 3. How to Use MathStore
+
+MathStore can be used via the **Command-Line Interface**, the **FastAPI Remote Server**, or directly as an imported **Python Library**.
+
+### 3.1 Installation & Setup
+
+#### Prerequisites
+- Python 3.12 or newer
+- [`uv`](https://github.com/astral-sh/uv) (recommended) or `pip`
+
+#### With `uv` (Fastest)
+```bash
+# Clone the repository
+git clone https://github.com/munenevictor577-blip/mathstore.git
+cd mathstore
+
+# Sync dependencies into isolated virtual environment
+uv sync
+
+# Run the CLI
+uv run mathstore --help
+```
+
+#### With standard `pip`
+```bash
+pip install -e .
+mathstore --help
+```
+
+---
+
+### 3.2 Command-Line Interface (CLI) Guide
+
+#### 1. Symbolic Calculus & Step-by-Step Derivations
+
+```bash
+# Basic differentiation
+mathstore diff "sin(x) * exp(x)"
+
+# Step-by-step differentiation showing product and power rules
+mathstore diff "x**2 * sin(x)" --steps
+
+# Natural mathematical syntax (spaces and carets supported)
+mathstore diff "2^x sin x" --steps
+
+# Higher-order derivative
+mathstore diff "x**4" --order 3 --var x
+
+# Indefinite integration with steps
+mathstore integrate "x * exp(x)" --steps
+
+# Definite integration with limits [0, 2] and FTC evaluation steps
+mathstore integrate "x**2" --limits 0 2 --steps
+
+# Compute limits (finite and infinite)
+mathstore limit "sin(x)/x" 0
+mathstore limit "1/x" oo
+```
+
+#### 2. Equation Solving
+
+```bash
+# Solve linear equation with step-by-step isolation
+mathstore solve "2*x + 4 = 10" --steps
+
+# Solve quadratic equation
+mathstore solve "x**2 - 5*x + 6 = 0" --steps
+
+# Algebraic expression simplification
+mathstore simplify "(x**2 - 1)/(x - 1)"
+```
+
+#### 3. Linear Algebra (`mathstore matrix`)
+
+```bash
+# Determinant of a 2x2 or 3x3 matrix
+mathstore matrix det "1, 2; 3, 4"
+
+# Matrix Inverse
+mathstore matrix inv "1, 2; 3, 4"
+
+# Reduced Row Echelon Form (RREF)
+mathstore matrix rref "1, 2, -1; 2, 4, 3"
+
+# Eigenvalues & algebraic multiplicities
+mathstore matrix eigen "2, 0; 0, 3"
+
+# Eigenvectors & eigenspace basis vectors
+mathstore matrix eigenvects "2, 0; 0, 3"
+
+# Matrix Rank and Nullity
+mathstore matrix rank "1, 2; 2, 4"
+mathstore matrix nullity "1, 2; 2, 4"
+
+# Matrix Trace
+mathstore matrix trace "5, 1; 2, 3"
+
+# Characteristic Polynomial
+mathstore matrix charpoly "1, 2; 3, 4"
+```
+
+#### 4. Probability & Statistics (`mathstore stats`)
+
+```bash
+# Five-number summary and dispersion
+mathstore stats summary "10, 12, 14, 15, 18, 20, 22"
+
+# Normal distribution PDF, CDF, and z-score
+mathstore stats normal 1.96 --mu 0 --sigma 1
+
+# Binomial distribution PMF: P(X = 3) for n=10, p=0.5
+mathstore stats binomial 3 --n 10 --p 0.5
+
+# Poisson distribution PMF: P(X = 2) for lambda=3.0
+mathstore stats poisson 2 --lam 3.0
+
+# 95% Student's t Confidence Interval
+mathstore stats ci "22, 25, 27, 24, 26, 28" --confidence 0.95
+
+# One-sample Student's t-test
+mathstore stats ttest "10.2, 9.8, 10.5, 10.1, 9.9" --pop-mean 10.0 --alt two-sided
+```
+
+#### 5. Active-Recall Practice Quizzer (`mathstore practice`)
+
+```bash
+# Start an interactive 5-question session across all topics
+mathstore practice
+
+# Target specific subject and difficulty
+mathstore practice derivatives --difficulty medium
+mathstore practice matrix --difficulty hard -n 3
+
+# Non-interactive question generation for worksheets or tests
+mathstore practice --generate --topic algebra -n 3 --seed 42
+```
+
+#### 6. Formula Reference Cheat Sheets (`mathstore ref`)
+
+```bash
+# List all available topics
+mathstore ref --list
+
+# View cheat sheet in terminal
+mathstore ref derivatives
+mathstore ref integrals
+mathstore ref trig
+
+# Export cheat sheet as LaTeX code
+mathstore ref derivatives --latex
+```
+
+#### 7. Output Formatting Flags (`--latex` and `--pretty`)
+
+All analytical commands support `--latex` and `--pretty` output formatting:
+
+```bash
+# Generate LaTeX equation output
+mathstore diff "sin(x)/x" --latex
+mathstore matrix inv "1, 2; 3, 4" --latex
+mathstore stats summary "10, 12, 14, 15, 18" --latex
+
+# Generate Unicode 2D typography
+mathstore diff "x**3 + 2*x" --pretty
+mathstore matrix rref "1, 2; 3, 4" --pretty
+```
+
+---
+
+### 3.3 FastAPI Remote Server Guide
+
+MathStore includes a production-ready FastAPI application for remote calling.
+
+#### Launching the Server
+```bash
+# Option 1: Via uvicorn command
+uv run uvicorn mathstore.api.main:app --host 0.0.0.0 --port 8000
+
+# Option 2: Via registered entrypoint
+uv run mathstore-server
+
+# Option 3: Via top-level api alias
+uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+#### Server Endpoints & URLs
+All endpoints are routed through `/math`:
+- **Interactive Swagger UI**: `http://localhost:8000/math/docs`
+- **ReDoc Documentation**: `http://localhost:8000/math/redoc`
+- **OpenAPI JSON Schema**: `http://localhost:8000/math/openapi.json`
+- **Health Check**: `http://localhost:8000/math/health`
+- **API Index**: `http://localhost:8000/math`
+
+#### cURL Examples
+
+```bash
+# Differentiate with step-by-step breakdown
+curl -X POST http://localhost:8000/math/diff \
+  -H "Content-Type: application/json" \
+  -d '{"expression": "x**2 * sin(x)", "steps": true}'
+
+# Definite integration
+curl -X POST http://localhost:8000/math/integrate \
+  -H "Content-Type: application/json" \
+  -d '{"expression": "x**2", "limits": [0, 2], "steps": true}'
+
+# Solve an equation
+curl -X POST http://localhost:8000/math/solve \
+  -H "Content-Type: application/json" \
+  -d '{"equation": "2*x + 4 = 10", "steps": true}'
+
+# Matrix Determinant
+curl -X POST http://localhost:8000/math/matrix/det \
+  -H "Content-Type: application/json" \
+  -d '{"matrix": "1, 2; 3, 4"}'
+
+# Normal Distribution Computation
+curl -X POST http://localhost:8000/math/stats/normal \
+  -H "Content-Type: application/json" \
+  -d '{"x": 1.96, "mu": 0, "sigma": 1}'
+
+# Generate a Practice Question
+curl "http://localhost:8000/math/practice/question?topic=derivatives&difficulty=medium"
+
+# Validate a Practice Answer
+curl -X POST http://localhost:8000/math/practice/check \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_answer": "2*x*cos(x) + 2*sin(x)",
+    "question": {
+      "topic": "derivatives",
+      "difficulty": "medium",
+      "prompt": "Find d/dx of 2*x*sin(x)",
+      "expected_answer": "2*x*cos(x) + 2*sin(x)",
+      "hint": "Product rule",
+      "question_type": "symbolic",
+      "variable": "x"
+    }
+  }'
+```
+
+---
+
+### 3.4 Python Library Usage
+
+MathStore can be imported directly into Python scripts, backend services, or Jupyter notebooks.
+
+```python
+# 1. Calculus & Step-by-Step Derivation
+from mathstore.calculus import CalculusAnalyzer
+
+calc = CalculusAnalyzer()
+deriv = calc.differentiate("2^x sin x", variable="x", order=1)
+steps = calc.differentiate_steps("x**2 * sin(x)", variable="x")
+for step in steps:
+    print(step)
+
+# 2. Equation Solving
+from mathstore.algebra import EquationSolver
+
+solver = EquationSolver()
+roots = solver.solve_linear("x**2 - 5*x + 6 = 0", variable="x")
+print("Roots:", roots)  # [2, 3]
+
+# 3. Matrix Analysis
+from mathstore.core import MatrixAnalyzer
+
+mat_engine = MatrixAnalyzer()
+det = mat_engine.determinant("1, 2; 3, 4")
+rref_str = mat_engine.rref("1, 2, -1; 2, 4, 3")
+eigenvalues = mat_engine.eigenvalues("2, 0; 0, 3")
+
+# 4. Probability & Statistics
+from mathstore.statistics import StatsAnalyzer
+
+stats = StatsAnalyzer()
+data = [10.2, 11.5, 12.1, 9.8, 10.9, 11.2]
+summary = stats.summary(data)
+ci_lower, ci_upper, margin = stats.confidence_interval(data, confidence=0.95)
+ttest = stats.one_sample_t_test(data, pop_mean=10.0, alternative="two-sided")
+
+# 5. Practice & Active-Recall Verification
+from mathstore.study import generate_question, check_answer
+
+q = generate_question(topic="derivatives", difficulty="medium", seed=101)
+is_correct, feedback = check_answer("2*cos(2*x)", q)
+print(f"Correct: {is_correct} | Feedback: {feedback}")
+```
+
+---
+
+## 4. Possible Future Additions & Architectural Roadmap
+
+To evolve MathStore from a university math toolkit into a comprehensive, enterprise-grade mathematical computation and EdTech platform, the following additions are proposed across analytical, architectural, and educational dimensions.
+
+### 4.1 Analytical & Mathematical Extensions
+
+#### 1. Multivariable & Vector Calculus (`mathstore.vector`)
+- **Partial Differentiation**: First-order and higher-order mixed partial derivatives ($\frac{\partial^2 f}{\partial x \partial y}$).
+- **Vector Differential Operators**:
+  - Gradient vector: $\nabla f = \left( \frac{\partial f}{\partial x}, \frac{\partial f}{\partial y}, \frac{\partial f}{\partial z} \right)$
+  - Divergence: $\nabla \cdot \mathbf{F}$
+  - Curl: $\nabla \times \mathbf{F}$
+  - Laplacian: $\nabla^2 f$
+- **Multiple Integrals**: Double ($\iint_R f(x, y) \, dA$) and triple ($\iiint_V f(x, y, z) \, dV$) integrals with support for Cartesian, polar, cylindrical, and spherical coordinate transformations with automatic Jacobian determinant scaling ($r \, dr \, d\theta$, $\rho^2 \sin \phi \, d\rho \, d\phi \, d\theta$).
+- **Integral Theorems**: Step-by-step verification of Green's Theorem, Stokes' Theorem, and Gauss's Divergence Theorem.
+
+#### 2. Ordinary & Partial Differential Equations (`mathstore.ode`)
+- **First-Order ODE Solver**:
+  - Analytical and step-by-step solutions for separable ODEs ($\frac{dy}{dx} = g(x)h(y)$).
+  - First-order linear ODEs using integrating factors: $\mu(x) = \exp\left(\int P(x) \, dx\right)$.
+  - Exact equations and Bernoulli equations.
+- **Second-Order Linear ODEs**:
+  - Homogeneous equations with constant coefficients ($ay'' + by' + cy = 0$) using characteristic polynomial roots (real distinct, repeated, complex conjugate).
+  - Non-homogeneous equations via the method of Undetermined Coefficients and Variation of Parameters.
+- **Initial Value Problems (IVPs)**: Solving for specific integration constants given initial conditions $y(x_0) = y_0$, $y'(x_0) = y'_0$.
+- **Laplace Transform Engine**: Forward $\mathcal{L}\{f(t)\}$ and inverse $\mathcal{L}^{-1}\{F(s)\}$ transforms with step-by-step operational tables for solving differential equations.
+
+#### 3. Advanced Linear Algebra & Matrix Factorizations
+- **Matrix Decompositions**:
+  - **LU Decomposition**: $A = LU$ (with partial pivoting $PA = LU$).
+  - **QR Decomposition**: $A = QR$ via Gram-Schmidt orthogonalization with step-by-step projections.
+  - **Cholesky Decomposition**: $A = LL^T$ for symmetric positive-definite matrices.
+  - **Singular Value Decomposition (SVD)**: $A = U \Sigma V^T$ with singular values and singular vectors.
+  - **Matrix Diagonalization**: $A = PDP^{-1}$ with verification of defective matrices.
+- **Linear Systems Solver ($A\mathbf{x} = \mathbf{b}$)**:
+  - Exact classification: Unique solution, infinitely many solutions (with parametric vector form), or inconsistent.
+  - Step-by-step Cramer's Rule for small systems.
+
+#### 4. Discrete Mathematics & Number Theory (`mathstore.discrete`)
+- **Modular Arithmetic**: Modular exponentiation ($a^b \pmod m$), modular inverse ($a^{-1} \pmod m$) using the Extended Euclidean Algorithm with step traces.
+- **Chinese Remainder Theorem**: Step-by-step system solution for simultaneous congruences.
+- **Combinatorics & Sequences**:
+  - Binomial and multinomial coefficient expansions.
+  - Recurrence relations solver (e.g. Fibonacci-style linear homogeneous recurrences).
+- **Basic Graph Theory**: Adjacency and Laplacian matrix properties, spectral graph theory, and shortest-path matrix representations.
+
+---
+
+### 4.2 Interactive Visualization & Plotting (`mathstore.viz`)
+
+MathStore currently operates purely on text, LaTeX, and Unicode. Adding visualization modules will significantly enhance student comprehension:
+
+- **2D Function Plotting**:
+  - Export mathematical curves to SVG, PNG, or ASCII terminal plots.
+  - Render functions alongside tangent lines at specified points, shaded areas under curves representing definite integrals, and Riemann sum rectangle approximations (Left, Right, Midpoint, Trapezoidal).
+- **3D Surface & Contour Plots**:
+  - Render scalar fields $z = f(x, y)$ and gradient vector fields.
+- **Direction & Slope Fields for ODEs**:
+  - Visualize direction fields $\frac{dy}{dx} = f(x, y)$ overlaid with numerical solution trajectories (Euler's method, Runge-Kutta RK4).
+- **Statistical Visualizations**:
+  - Histograms with overlaid normal curve density fits.
+  - Box-and-whisker plots highlighting outliers, $Q_1$, median, and $Q_3$.
+  - Two-tailed Student's $t$ critical rejection regions shaded under the curve.
+
+---
+
+### 4.3 Advanced Educational & EdTech Features
+
+#### 1. Spaced-Repetition System (SRS) & Persistent Learning State
+- Implement an algorithm (e.g., SM-2 / Anki-style spaced repetition) that tracks a student's accuracy, response time, and mistake history.
+- Automatically serve practice questions on topics where the user has demonstrated weaker retention.
+- Local SQLite or PostgreSQL state storage for tracking student performance over time.
+
+#### 2. Automated PDF & LaTeX Worksheet Generator
+- Generate complete, publication-ready problem set worksheets and exam papers.
+- Option to generate matching **Instructor Solution Manuals** containing step-by-step derivations for each problem.
+- Configurable layout templates (single-column, two-column, quiz cards).
+
+#### 3. Intelligent Intermediate Error Diagnosis
+- When a student provides an incorrect answer during active-recall practice, compare the student's answer against common misconception heuristics:
+  - Forgot the Chain Rule factor?
+  - Dropped the negative sign in $-\sin(x)$?
+  - Differentiated instead of integrated?
+  - Off by a constant factor?
+- Provide actionable, diagnostic feedback rather than a simple binary "Incorrect".
+
+#### 4. Lightweight Web Frontend (Dashboard UI)
+- A decoupled, responsive single-page application (SPA) built with React/Next.js or HTMX + Tailwind CSS.
+- Directly consumes the existing `/math` endpoints.
+- Interactive derivation step explorer, visual matrix scratchpad, and live quiz dashboard.
+
+---
+
+### 4.4 System Engineering, Performance & DevOps
+
+#### 1. Distributed Caching & Symbolic Memoization
+- Symbolic differentiation and manual integration of complex nested expressions can be computationally expensive.
+- Integrate an LRU / Redis caching layer keyed by normalized expression strings and operation parameters, enabling sub-millisecond response times for frequent queries.
+
+#### 2. Asynchronous Long-Running Task Queue
+- For heavy symbolic operations, high-dimensional matrices, or bulk worksheet generation, integrate background worker queues (e.g., Celery or ARQ with Redis).
+- Expose job status endpoints (`/math/jobs/{job_id}`) with webhook callbacks.
+
+#### 3. Security Hardening & Multi-Tenancy
+- **Resource Constraints**: Impose strict CPU execution timeouts and memory limits on SymPy evaluations using worker process isolation to guard against algorithmic complexity attacks (ReDoS or CAS infinite loops).
+- **API Rate Limiting & Auth**: Add token bucket rate limiting (e.g., via `slowapi`) and optional API key authentication for multi-tenant deployment.
+
+#### 4. Cloud-Native Deployment & Observability
+- **Dockerization**: Provide an optimized, multi-stage `Dockerfile` and `docker-compose.yml` for zero-configuration container deployment.
+- **Telemetry**: Add OpenTelemetry instrumentation, Prometheus metrics (`/metrics`), and structured JSON logging for latency and error tracking in production Kubernetes environments.
+
+---
+
+## 5. Summary Architecture Matrix
+
+| Layer | Current Implementation | Planned Roadmap Additions |
+|---|---|---|
+| **Calculus** | Single-variable derivatives, integrals, limits, step-by-step rules | Multivariable partials, gradients, divergence, curl, multiple integrals, Green/Stokes |
+| **Algebra** | Linear/quadratic equations, simplification | Systems of equations, polynomial factorizations, inequality solvers |
+| **Linear Algebra** | Det, inverse, RREF, eigenvalues, eigenvectors, rank, nullity, trace | LU, QR, SVD, Cholesky, Gram-Schmidt steps, vector space bases |
+| **Differential Eq.** | *None* | 1st order ODEs (separable, linear), 2nd order linear ODEs, IVPs, Laplace transforms |
+| **Statistics** | Five-number summary, Normal/Binomial/Poisson, $t$-CI, one-sample $t$-test | Two-sample $t$-tests, ANOVA, linear regression, Chi-square tests |
+| **Practice Quizzer** | Randomized procedural questions, symbolic equivalence checker | Spaced repetition (SM-2), student history persistence, diagnostic error hints |
+| **Presentation** | Plain text, LaTeX, Unicode pretty | 2D/3D SVG/PNG plotting, direction fields, PDF worksheet generation |
+| **API & Transport** | FastAPI at `/math`, Swagger at `/math/docs`, ReDoc at `/math/redoc`, Schema at `/math/openapi.json` | Redis caching, Celery task queue, Docker containers, React/HTMX web UI |
+
+---
+
+*Document compiled for the MathStore Project.*

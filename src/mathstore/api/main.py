@@ -23,8 +23,10 @@ def create_app() -> FastAPI:
             "linear algebra, probability, statistics, reference cheat sheets, and active-recall practice."
         ),
         version="0.1.0",
-        docs_url="/api/v1/math/docs",
-        redoc_url="/redoc",
+        docs_url="/math/docs",
+        redoc_url="/math/redoc",
+        openapi_url="/math/openapi.json",
+        swagger_ui_oauth2_redirect_url="/math/docs/oauth2-redirect",
     )
 
     # Enable CORS for cross-origin and remote frontend calling
@@ -36,8 +38,23 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Core math router with the required prefix: /api/v1/math
-    math_router = APIRouter(prefix="/api/v1/math")
+    # Core math router with prefix: /math
+    math_router = APIRouter(prefix="/math")
+
+    @math_router.get("", summary="Math API Index", include_in_schema=False)
+    @math_router.get("/", summary="Math API Index")
+    def math_root() -> dict[str, Any]:
+        """Root API metadata index for the Math API prefix."""
+        return {
+            "name": "MathStore API",
+            "description": "Mathematical Toolkit API for university study and revision",
+            "version": "0.1.0",
+            "prefix": "/math",
+            "docs_url": "/math/docs",
+            "redoc_url": "/math/redoc",
+            "openapi_url": "/math/openapi.json",
+            "health_url": "/math/health",
+        }
 
     @math_router.get("/health", summary="Math API health check")
     def math_health() -> dict[str, Any]:
@@ -45,11 +62,11 @@ def create_app() -> FastAPI:
         return {
             "status": "healthy",
             "service": "mathstore",
-            "prefix": "/api/v1/math",
+            "prefix": "/math",
             "version": "0.1.0",
         }
 
-    # Register sub-routers under /api/v1/math
+    # Register sub-routers under /math
     math_router.include_router(calculus_router)
     math_router.include_router(algebra_router)
     math_router.include_router(matrix_router)
@@ -59,20 +76,15 @@ def create_app() -> FastAPI:
     # Mount the general math router on the app
     app.include_router(math_router)
 
-    # Root informational routes
-    @app.get("/", summary="Root API Index")
-    def root() -> dict[str, Any]:
-        return {
-            "name": "MathStore API",
-            "description": "Mathematical Toolkit API for university study and revision",
-            "version": "0.1.0",
-            "prefix": "/api/v1/math",
-            "docs_url": "/api/v1/math/docs",
-            "redoc_url": "/redoc",
-            "health_url": "/api/v1/math/health",
-        }
+    # Maintain backward compatibility for /api/v1/math callers
+    app.include_router(math_router, prefix="/api/v1", include_in_schema=False)
 
-    @app.get("/health", summary="Global health check")
+    # Root informational routes
+    @app.get("/", summary="Root API Index", include_in_schema=False)
+    def root() -> dict[str, Any]:
+        return math_root()
+
+    @app.get("/health", summary="Global health check", include_in_schema=False)
     def global_health() -> dict[str, Any]:
         return {"status": "ok", "service": "mathstore", "version": "0.1.0"}
 
