@@ -19,7 +19,7 @@
   - [Linear Algebra (`matrix`)](#4-linear-algebra-matrix)
   - [Statistics & Hypothesis Testing (`stats`)](#5-statistics--hypothesis-testing-stats)
   - [Formula Reference Cheat Sheets (`ref`)](#6-formula-reference-cheat-sheets-ref)
-- [FastAPI Remote Server (`/api/v1/math`)](#fastapi-remote-server-apiv1math)
+- [FastAPI Remote Server (`/math`)](#fastapi-remote-server-math)
   - [Starting the Server](#starting-the-server)
   - [API Endpoints Overview](#api-endpoints-overview)
   - [cURL Examples](#curl-examples)
@@ -239,7 +239,7 @@ mathstore matrix rref "1, 2; 3, 4" --pretty
 
 ---
 
-## FastAPI Remote Server (`/api/v1/math`)
+## FastAPI Remote Server (`/math`)
 
 MathStore includes a production-ready FastAPI server with CORS support and OpenAPI documentation, enabling remote calling over HTTP from web applications, mobile clients, and microservices.
 
@@ -256,67 +256,69 @@ uv run mathstore-server
 uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
-- **Interactive Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **ReDoc Documentation**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
-- **Health Check**: [http://localhost:8000/api/v1/math/health](http://localhost:8000/api/v1/math/health)
+- **Interactive Swagger UI**: [http://localhost:8000/math/docs](http://localhost:8000/math/docs)
+- **ReDoc Documentation**: [http://localhost:8000/math/redoc](http://localhost:8000/math/redoc)
+- **OpenAPI Schema**: [http://localhost:8000/math/openapi.json](http://localhost:8000/math/openapi.json)
+- **Health Check**: [http://localhost:8000/math/health](http://localhost:8000/math/health)
+- **API Index**: [http://localhost:8000/math](http://localhost:8000/math)
 
 ### API Endpoints Overview
 
-All mathematical endpoints are mounted under the `/api/v1/math` prefix:
+All mathematical endpoints are mounted under the `/math` prefix (with `/api/v1/math` preserved for backward compatibility):
 
 | Category | Method & Path | Description |
 |---|---|---|
-| **Calculus** | `POST, GET /api/v1/math/diff` | Differentiate with optional steps & formatting |
-| | `POST, GET /api/v1/math/integrate` | Indefinite / definite integral with steps |
-| | `POST, GET /api/v1/math/limit` | Evaluate limits |
-| **Algebra** | `POST, GET /api/v1/math/solve` | Solve equations with optional steps |
-| | `POST, GET /api/v1/math/simplify` | Simplify expressions |
-| **Matrix** | `POST /api/v1/math/matrix/{operation}` | Matrix ops: `det`, `inv`, `rref`, `eigen`, `rank`, `trace`, etc. |
-| **Statistics**| `POST /api/v1/math/stats/summary` | Descriptive summary statistics |
-| | `POST, GET /api/v1/math/stats/normal` | Normal distribution PDF, CDF, z-score |
-| | `POST, GET /api/v1/math/stats/binomial`| Binomial PMF and CDF |
-| | `POST, GET /api/v1/math/stats/poisson` | Poisson PMF and CDF |
-| | `POST /api/v1/math/stats/ci` | Confidence intervals |
-| | `POST /api/v1/math/stats/ttest` | One-sample Student's t-test |
-| **Steps** | `POST, GET /api/v1/math/steps/diff` | Step-by-step differentiation |
-| | `POST, GET /api/v1/math/steps/integrate` | Step-by-step integration |
-| | `POST, GET /api/v1/math/steps/solve` | Step-by-step equation solving |
-| **Practice** | `GET /api/v1/math/practice/question` | Generate randomized revision question |
-| | `POST /api/v1/math/practice/check` | Validate answer with symbolic equivalence |
-| **Reference**| `GET /api/v1/math/ref` | List formula cheat sheet topics |
-| | `GET /api/v1/math/ref/{topic}` | Get cheat sheet (text or LaTeX) |
-| **Health** | `GET /api/v1/math/health` | Service health status |
+| **Calculus** | `POST, GET /math/diff` | Differentiate with optional steps & formatting |
+| | `POST, GET /math/integrate` | Indefinite / definite integral with steps |
+| | `POST, GET /math/limit` | Evaluate limits |
+| **Algebra** | `POST, GET /math/solve` | Solve equations with optional steps |
+| | `POST, GET /math/simplify` | Simplify expressions |
+| **Matrix** | `POST /math/matrix/{operation}` | Matrix ops: `det`, `inv`, `rref`, `eigen`, `rank`, `trace`, etc. |
+| **Statistics**| `POST /math/stats/summary` | Descriptive summary statistics |
+| | `POST, GET /math/stats/normal` | Normal distribution PDF, CDF, z-score |
+| | `POST, GET /math/stats/binomial`| Binomial PMF and CDF |
+| | `POST, GET /math/stats/poisson` | Poisson PMF and CDF |
+| | `POST /math/stats/ci` | Confidence intervals |
+| | `POST /math/stats/ttest` | One-sample Student's t-test |
+| **Steps** | `POST, GET /math/steps/diff` | Step-by-step differentiation |
+| | `POST, GET /math/steps/integrate` | Step-by-step integration |
+| | `POST, GET /math/steps/solve` | Step-by-step equation solving |
+| **Practice** | `GET /math/practice/question` | Generate randomized revision question |
+| | `POST /math/practice/check` | Validate answer with symbolic equivalence |
+| **Reference**| `GET /math/ref` | List formula cheat sheet topics |
+| | `GET /math/ref/{topic}` | Get cheat sheet (text or LaTeX) |
+| **Health** | `GET /math/health` | Service health status |
 
 ### cURL Examples
 
 ```bash
 # Differentiate with step-by-step breakdown
-curl -X POST http://localhost:8000/api/v1/math/diff \
+curl -X POST http://localhost:8000/math/diff \
   -H "Content-Type: application/json" \
   -d '{"expression": "x**2 * sin(x)", "steps": true}'
 
 # Definite integration
-curl -X POST http://localhost:8000/api/v1/math/integrate \
+curl -X POST http://localhost:8000/math/integrate \
   -H "Content-Type: application/json" \
   -d '{"expression": "x**2", "limits": [0, 2], "steps": true}'
 
 # Solve an equation
-curl -X POST http://localhost:8000/api/v1/math/solve \
+curl -X POST http://localhost:8000/math/solve \
   -H "Content-Type: application/json" \
   -d '{"equation": "2*x + 4 = 10", "steps": true}'
 
 # Calculate 2x2 matrix determinant
-curl -X POST http://localhost:8000/api/v1/math/matrix/det \
+curl -X POST http://localhost:8000/math/matrix/det \
   -H "Content-Type: application/json" \
   -d '{"matrix": "1, 2; 3, 4"}'
 
 # Normal distribution calculation
-curl -X POST http://localhost:8000/api/v1/math/stats/normal \
+curl -X POST http://localhost:8000/math/stats/normal \
   -H "Content-Type: application/json" \
   -d '{"x": 1.96, "mu": 0, "sigma": 1}'
 
 # Generate practice question
-curl http://localhost:8000/api/v1/math/practice/question?topic=derivatives
+curl http://localhost:8000/math/practice/question?topic=derivatives
 ```
 
 ---
@@ -459,7 +461,7 @@ mathstore/
 │   │   ├── __init__.py
 │   │   ├── main.py             # FastAPI application & server runner
 │   │   ├── schemas.py          # Pydantic request & response models
-│   │   └── routes/             # Route modules (/api/v1/math)
+│   │   └── routes/             # Route modules (/math)
 │   ├── calculus/
 │   │   └── analyzer.py         # Differentiation, integration, and limits
 │   ├── core/
