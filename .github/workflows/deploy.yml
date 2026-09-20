@@ -3,7 +3,6 @@ name: Deploy Mathstore to GCP
 on:
   push:
     branches:
-      - server
       - main
 
 jobs:
@@ -21,10 +20,10 @@ jobs:
           script: |
             cd /srv/apps/mathstore
 
-            # 1. Force sync with the remote server branch
+            # 1. Force sync with the remote main branch
             git fetch --all
-            git reset --hard origin/server
-            git pull origin server
+            git reset --hard origin/main
+            git pull origin main
 
             # 2. Sync dependencies using uv
             ~/.local/bin/uv sync
