@@ -507,6 +507,15 @@ uvx ruff format .
 
 ---
 
+## Roadmap & Cloud Service
+
+MathStore is under active development. Upcoming milestones include:
+- **Managed Cloud API**: Hosted high-availability API with API keys and rate limiting for EdTech platforms and LMS integrations.
+- **Web & Mobile Interface**: Interactive active-recall study companion with visual step-by-step derivations.
+- **Extended Solvers**: Support for ordinary differential equations (ODEs), vector calculus, and LaTeX export templates.
+
+If you are interested in early access to the managed cloud API or want to request features for your institution, feel free to open an [Issue](https://github.com/munenevictor577-blip/mathstore/issues) or reach out to the maintainers.
+
 ## License
 
 This project is licensed under the MIT License.
