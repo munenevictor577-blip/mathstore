@@ -1,6 +1,6 @@
 # MathStore 🎓
 
-[![Tests](https://img.shields.io/badge/tests-232%20passed-success)](https://github.com/munenevictor577-blip/mathstore)
+[![Tests](https://img.shields.io/badge/tests-257%20passed-success)](https://github.com/munenevictor577-blip/mathstore)
 [![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/munenevictor577-blip/mathstore)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://python.org)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -473,7 +473,7 @@ mathstore/
 │   └── study/
 │       ├── steps.py            # Step-by-step derivation generators
 │       └── practice.py         # Active-recall quizzer & answer verification
-└── tests/                      # Pytest test suites (232 tests, 91% coverage)
+└── tests/                      # Pytest test suites (257 tests, 91% coverage)
     ├── test_algebra.py
     ├── test_api.py
     ├── test_calculus.py

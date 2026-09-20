@@ -12,6 +12,7 @@ on:
         type: choice
         options:
           - pypi
+          - testpypi
 
 jobs:
   test:
@@ -19,13 +20,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v2
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install project and pytest
-        # Installs the package in editable mode along with testing tools
-        run: uv pip install -e . pytest
+      - name: Install project and test dependencies
+        run: uv sync --dev
       - name: Execute test suite
         run: uv run pytest tests/
 
@@ -35,7 +37,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v2
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -49,7 +53,7 @@ jobs:
 
   publish-testpypi:
     name: Publish to TestPyPI
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'testpypi')
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -59,7 +63,7 @@ jobs:
         with:
           name: dist-files
           path: dist/
-      - uses: astral-sh/setup-uv@v2
+      - uses: astral-sh/setup-uv@v5
       - name: Publish to TestPyPI
         run: uv publish --publish-url https://test.pypi.org/legacy/
 
@@ -75,6 +79,6 @@ jobs:
         with:
           name: dist-files
           path: dist/
-      - uses: astral-sh/setup-uv@v2
+      - uses: astral-sh/setup-uv@v5
       - name: Publish to PyPI
         run: uv publish
