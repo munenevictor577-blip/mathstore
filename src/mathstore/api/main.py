@@ -22,7 +22,7 @@ def create_app() -> FastAPI:
             "and STEM applications. Provides symbolic calculus, step-by-step derivations, "
             "linear algebra, probability, statistics, reference cheat sheets, and active-recall practice."
         ),
-        version="0.1.1a1",
+        version="0.1.1a2",
         root_path="/math"
     )
 
@@ -50,7 +50,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health", summary="Global health check", include_in_schema=False)
     def global_health() -> dict[str, Any]:
-        return {"status": "ok", "service": "mathstore", "version": "0.1.0"}
+        return {"status": "ok", "service": "mathstore", "version": app.version}
 
 
     return app

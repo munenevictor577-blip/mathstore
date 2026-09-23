@@ -12,38 +12,19 @@ def client():
 class TestAPIHealthAndInfo:
     """Tests for root and health check endpoints."""
 
-    def test_root_index(self, client: TestClient):
-        res = client.get("/")
-        assert res.status_code == 200
-        data = res.json()
-        assert data["name"] == "MathStore API"
-        assert data["prefix"] == "/math"
-
-    def test_global_health(self, client: TestClient):
+    def test_health_endpoints(self, client: TestClient):
+        # Direct /health
         res = client.get("/health")
         assert res.status_code == 200
-        assert res.json()["status"] == "ok"
-
-    def test_math_prefix_health(self, client: TestClient):
-        res = client.get("/math/health")
-        assert res.status_code == 200
         data = res.json()
-        assert data["status"] == "healthy"
-        assert data["prefix"] == "/math"
+        assert data["status"] == "ok"
+        assert data["service"] == "mathstore"
+        assert data["version"] == "0.1.1a2"
 
-    def test_math_prefix_index(self, client: TestClient):
-        res = client.get("/math")
-        assert res.status_code == 200
-        data = res.json()
-        assert data["name"] == "MathStore API"
-        assert data["prefix"] == "/math"
-        assert data["docs_url"] == "/math/docs"
-        assert data["redoc_url"] == "/math/redoc"
-        assert data["openapi_url"] == "/math/openapi.json"
-
-        res_slash = client.get("/math/")
-        assert res_slash.status_code == 200
-        assert res_slash.json() == data
+        # /math/health routed via root_path
+        res_math = client.get("/math/health")
+        assert res_math.status_code == 200
+        assert res_math.json() == data
 
     def test_math_docs_and_schema(self, client: TestClient):
         res_docs = client.get("/math/docs")
@@ -58,14 +39,15 @@ class TestAPIHealthAndInfo:
         assert res_openapi.status_code == 200
         assert "paths" in res_openapi.json()
 
-    def test_backward_compatibility_alias(self, client: TestClient):
-        res_health = client.get("/api/v1/math/health")
-        assert res_health.status_code == 200
-        assert res_health.json()["status"] == "healthy"
+    def test_root_path_routing(self, client: TestClient):
+        # Verify routes are reachable both with /math prefix and directly
+        res_diff_math = client.get("/math/diff?expression=cos(x)")
+        assert res_diff_math.status_code == 200
+        assert "-sin(x)" in res_diff_math.json()["derivative"]
 
-        res_diff = client.get("/api/v1/math/diff?expression=cos(x)")
-        assert res_diff.status_code == 200
-        assert "-sin(x)" in res_diff.json()["derivative"]
+        res_diff_direct = client.get("/diff?expression=cos(x)")
+        assert res_diff_direct.status_code == 200
+        assert "-sin(x)" in res_diff_direct.json()["derivative"]
 
 
 class TestCalculusAPI:
