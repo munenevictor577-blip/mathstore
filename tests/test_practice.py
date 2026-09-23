@@ -8,14 +8,14 @@ from mathstore.study.practice import (
     TOPIC_ALIASES,
     PracticeQuestion,
     PracticeSession,
+    _gen_algebra_question,
+    _gen_derivative_question,
+    _gen_integral_question,
+    _gen_matrix_question,
+    _gen_stats_question,
     check_answer,
     format_question_card,
     generate_question,
-    _gen_derivative_question,
-    _gen_integral_question,
-    _gen_algebra_question,
-    _gen_matrix_question,
-    _gen_stats_question,
 )
 
 
@@ -73,7 +73,9 @@ class TestPracticeQuestionGeneration:
         # Integrals: hard arctan_form (lines 396-399)
         with patch.object(rng, "choice", side_effect=["arctan_form"]):
             q_int_at = _gen_integral_question("hard", rng)
-            assert "atan" in q_int_at.expected_answer or "arctan" in q_int_at.hint.lower()
+            assert (
+                "atan" in q_int_at.expected_answer or "arctan" in q_int_at.hint.lower()
+            )
 
         # Algebra: medium monic quadratic (lines 465-472)
         with patch.object(rng, "choice", side_effect=["monic_quadratic"]):
@@ -101,7 +103,9 @@ class TestPracticeQuestionGeneration:
             assert "range" in q_stat_range.prompt.lower()
 
         # Fallback in generate_question (line 760)
-        with patch.dict(TOPIC_ALIASES, {"custom_unmapped": "unmapped_val"}, clear=False):
+        with patch.dict(
+            TOPIC_ALIASES, {"custom_unmapped": "unmapped_val"}, clear=False
+        ):
             q_fallback = generate_question("custom_unmapped", rng=rng)
             assert q_fallback.topic == "derivatives"
 

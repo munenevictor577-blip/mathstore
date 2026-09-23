@@ -38,11 +38,15 @@ class DerivativeStepGenerator:
             return sp.Integer(0)
 
         if expr == self.var:
-            steps.append(f"Derivative of variable {self.var} with respect to {self.var} is 1")
+            steps.append(
+                f"Derivative of variable {self.var} with respect to {self.var} is 1"
+            )
             return sp.Integer(1)
 
         if expr.is_Add:
-            steps.append(f"Apply Sum Rule to ({expr}): differentiate each term individually")
+            steps.append(
+                f"Apply Sum Rule to ({expr}): differentiate each term individually"
+            )
             term_diffs = []
             for arg in expr.args:
                 sub_steps: list[str] = []
@@ -82,7 +86,9 @@ class DerivativeStepGenerator:
             if sub_v:
                 steps.append(f"  Differentiate v = {v}: " + "; ".join(sub_v))
             res = sp.simplify(du * v + u * dv)
-            steps.append(f"Substitute into product formula: ({du})*({v}) + ({u})*({dv}) = {res}")
+            steps.append(
+                f"Substitute into product formula: ({du})*({v}) + ({u})*({dv}) = {res}"
+            )
             return res
 
         if expr.is_Pow:
@@ -98,7 +104,7 @@ class DerivativeStepGenerator:
                 db = self._diff_expr(base, sub_b)
                 res = exp * (base ** (exp - 1)) * db
                 steps.append(
-                    f"Apply Power and Chain Rule to ({base})^{exp}: outer = {exp}*({base})^{exp-1}, inner d/d{self.var}[{base}] = {db}"
+                    f"Apply Power and Chain Rule to ({base})^{exp}: outer = {exp}*({base})^{exp - 1}, inner d/d{self.var}[{base}] = {db}"
                 )
                 steps.append(f"Result: {res}")
                 return res
@@ -152,7 +158,9 @@ class DerivativeStepGenerator:
         return res
 
 
-def get_derivative_steps(expression_str: str, variable: str = "x", order: int = 1) -> list[str]:
+def get_derivative_steps(
+    expression_str: str, variable: str = "x", order: int = 1
+) -> list[str]:
     """Returns a list of step-by-step explanations for differentiating an expression."""
     generator = DerivativeStepGenerator(variable=variable)
     return generator.explain(expression_str, order=order)
@@ -196,18 +204,26 @@ def format_integral_rule(rule: sp.Basic | object, depth: int = 0) -> list[str]:
         u_func = getattr(rule, "u_func", "u")
         var = getattr(rule, "variable", "x")
         du_expr = sp.diff(u_func, var)
-        steps.append(f"Apply substitution: let u = {u_func}, then du = ({du_expr}) d{var}")
+        steps.append(
+            f"Apply substitution: let u = {u_func}, then du = ({du_expr}) d{var}"
+        )
         steps.append(f"Transformed integral: ∫ {rule.substep.integrand} d{u_var}")
         steps.extend(format_integral_rule(rule.substep, depth + 1))
         steps.append(f"Substitute back u = {u_func}: {rule.eval()}")
     elif rule_type == "PartsRule":
         var = getattr(rule, "variable", "x")
         du_expr = sp.diff(rule.u, var)
-        v_eval = rule.v_step.eval() if hasattr(rule.v_step, "eval") else sp.integrate(rule.dv, var)
+        v_eval = (
+            rule.v_step.eval()
+            if hasattr(rule.v_step, "eval")
+            else sp.integrate(rule.dv, var)
+        )
         steps.append("Apply Integration by Parts: ∫ u dv = u*v - ∫ v du")
         steps.append(f"  Choose u = {rule.u}, dv = {rule.dv}")
         steps.append(f"  Compute du = ({du_expr}) d{var}, v = {v_eval}")
-        steps.append(f"  Formula gives: ({rule.u})*({v_eval}) - ∫ ({v_eval})*({du_expr}) d{var}")
+        steps.append(
+            f"  Formula gives: ({rule.u})*({v_eval}) - ∫ ({v_eval})*({du_expr}) d{var}"
+        )
         steps.extend(format_integral_rule(rule.second_step, depth + 1))
         steps.append(f"Combine result from parts: {rule.eval()}")
     elif rule_type == "ExpRule":
@@ -215,22 +231,36 @@ def format_integral_rule(rule: sp.Basic | object, depth: int = 0) -> list[str]:
             f"Integrate exponential function {rule.integrand}: ∫ {rule.integrand} d{rule.variable} = {rule.eval()}"
         )
     elif rule_type == "SinRule":
-        steps.append(f"Integrate sine: ∫ sin({rule.variable}) d{rule.variable} = -cos({rule.variable})")
+        steps.append(
+            f"Integrate sine: ∫ sin({rule.variable}) d{rule.variable} = -cos({rule.variable})"
+        )
     elif rule_type == "CosRule":
-        steps.append(f"Integrate cosine: ∫ cos({rule.variable}) d{rule.variable} = sin({rule.variable})")
+        steps.append(
+            f"Integrate cosine: ∫ cos({rule.variable}) d{rule.variable} = sin({rule.variable})"
+        )
     elif rule_type == "Sec2Rule":
-        steps.append(f"Integrate secant squared: ∫ sec({rule.variable})^2 d{rule.variable} = tan({rule.variable})")
+        steps.append(
+            f"Integrate secant squared: ∫ sec({rule.variable})^2 d{rule.variable} = tan({rule.variable})"
+        )
     elif rule_type == "Csc2Rule":
-        steps.append(f"Integrate cosecant squared: ∫ csc({rule.variable})^2 d{rule.variable} = -cot({rule.variable})")
+        steps.append(
+            f"Integrate cosecant squared: ∫ csc({rule.variable})^2 d{rule.variable} = -cot({rule.variable})"
+        )
     elif rule_type == "ReciprocalRule":
-        steps.append(f"Integrate reciprocal: ∫ 1/{rule.variable} d{rule.variable} = ln|{rule.variable}|")
+        steps.append(
+            f"Integrate reciprocal: ∫ 1/{rule.variable} d{rule.variable} = ln|{rule.variable}|"
+        )
     elif rule_type in ("ArctanRule", "ArcsinRule"):
-        steps.append(f"Integrate standard form: ∫ {rule.integrand} d{rule.variable} = {rule.eval()}")
+        steps.append(
+            f"Integrate standard form: ∫ {rule.integrand} d{rule.variable} = {rule.eval()}"
+        )
     elif hasattr(rule, "substep"):
         steps.append(f"Apply {rule_type} to {getattr(rule, 'integrand', '')}")
         steps.extend(format_integral_rule(rule.substep, depth + 1))
     elif hasattr(rule, "eval"):
-        steps.append(f"Evaluate integral of {getattr(rule, 'integrand', '')}: {rule.eval()}")
+        steps.append(
+            f"Evaluate integral of {getattr(rule, 'integrand', '')}: {rule.eval()}"
+        )
     else:
         var = getattr(rule, "variable", sp.Symbol("x"))
         integrand = getattr(rule, "integrand", rule)
@@ -257,7 +287,9 @@ def get_integral_steps(
         rule = integral_steps(expr, var)
         if type(rule).__name__ == "DontKnowRule":
             res = sp.integrate(expr, var)
-            steps.append(f"Direct integration using general integration algorithms: {res}")
+            steps.append(
+                f"Direct integration using general integration algorithms: {res}"
+            )
         else:
             steps.extend(format_integral_rule(rule))
     except Exception:  # noqa: BLE001
@@ -269,13 +301,21 @@ def get_integral_steps(
 
     if limits is not None:
         lower, upper = limits
-        steps.append("Apply the Fundamental Theorem of Calculus: ∫[a to b] f(x) dx = F(b) - F(a)")
+        steps.append(
+            "Apply the Fundamental Theorem of Calculus: ∫[a to b] f(x) dx = F(b) - F(a)"
+        )
         fb = sp.simplify(antideriv.subs(var, upper))
         fa = sp.simplify(antideriv.subs(var, lower))
-        steps.append(f"Evaluate antiderivative at upper limit x = {upper}: F({upper}) = {fb}")
-        steps.append(f"Evaluate antiderivative at lower limit x = {lower}: F({lower}) = {fa}")
+        steps.append(
+            f"Evaluate antiderivative at upper limit x = {upper}: F({upper}) = {fb}"
+        )
+        steps.append(
+            f"Evaluate antiderivative at lower limit x = {lower}: F({lower}) = {fa}"
+        )
         net = sp.simplify(fb - fa)
-        steps.append(f"Compute difference: F({upper}) - F({lower}) = ({fb}) - ({fa}) = {net}")
+        steps.append(
+            f"Compute difference: F({upper}) - F({lower}) = ({fb}) - ({fa}) = {net}"
+        )
     else:
         steps.append(f"Add arbitrary constant of integration: {antideriv} + C")
 
@@ -308,11 +348,17 @@ def get_equation_steps(equation_str: str, variable: str = "x") -> list[str]:
         if deg == 1:
             a = poly.coeff_monomial(var**1)
             b = poly.coeff_monomial(var**0)
-            steps.append(f"Identify linear equation a*{variable} + b = 0 with a = {a}, b = {b}")
+            steps.append(
+                f"Identify linear equation a*{variable} + b = 0 with a = {a}, b = {b}"
+            )
             if b != 0:
-                steps.append(f"Isolate variable term by subtracting constant: {a}*{variable} = {-b}")
+                steps.append(
+                    f"Isolate variable term by subtracting constant: {a}*{variable} = {-b}"
+                )
             if a != 1:
-                steps.append(f"Divide both sides by coefficient {a}: {variable} = {-b}/{a} = {-b / a}")
+                steps.append(
+                    f"Divide both sides by coefficient {a}: {variable} = {-b}/{a} = {-b / a}"
+                )
             sol = -b / a
             steps.append(f"Solution: {variable} = {sol}")
             return steps
@@ -336,7 +382,9 @@ def get_equation_steps(equation_str: str, variable: str = "x") -> list[str]:
                 else:
                     steps.append("Δ < 0: Equation has two complex conjugate roots.")
             else:
-                steps.append(f"Sign of discriminant Δ = {disc} depends on parameter values.")
+                steps.append(
+                    f"Sign of discriminant Δ = {disc} depends on parameter values."
+                )
             steps.append(f"Apply quadratic formula: {variable} = (-b ± √Δ) / (2a)")
             sols = sp.solve(diff_expr, var)
             steps.append(f"Solutions: {variable} = {sols}")

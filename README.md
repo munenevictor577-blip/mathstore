@@ -409,7 +409,9 @@ print(f"95% CI: [{ci_lower:.2f}, {ci_upper:.2f}] ± {margin:.2f}")
 
 # Hypothesis testing (One-sample Student's t-test)
 test_results = stats.one_sample_t_test(data, pop_mean=10.0, alternative="two-sided")
-print(f"t-stat: {test_results['t_statistic']:.4f}, p-value: {test_results['p_value']:.4f}")
+print(
+    f"t-stat: {test_results['t_statistic']:.4f}, p-value: {test_results['p_value']:.4f}"
+)
 ```
 
 ### Practice & Revision API

@@ -51,7 +51,9 @@ class PracticeQuestion:
     expected_answer: str
     hint: str
     steps: list[str] = field(default_factory=list)
-    question_type: str = "symbolic"  # "derivative", "integral", "roots", "number", "symbolic"
+    question_type: str = (
+        "symbolic"  # "derivative", "integral", "roots", "number", "symbolic"
+    )
     correct_value: Any = None
     variable: str = "x"
     is_definite: bool = False
@@ -109,7 +111,9 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
                 else:
                     raw_correct = [question.correct_value]
             else:
-                ans_cleaned = re.sub(r"[a-zA-Z]\s*=\s*", "", question.expected_answer).strip("[]{}()")
+                ans_cleaned = re.sub(
+                    r"[a-zA-Z]\s*=\s*", "", question.expected_answer
+                ).strip("[]{}()")
                 raw_correct = [p.strip() for p in ans_cleaned.split(",") if p.strip()]
 
             correct_roots = {
@@ -132,11 +136,18 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
         try:
             norm = _normalize_input_str(raw)
             val = float(safe_sympify(norm))
-            target_raw = question.correct_value if question.correct_value is not None else question.expected_answer
+            target_raw = (
+                question.correct_value
+                if question.correct_value is not None
+                else question.expected_answer
+            )
             target = float(safe_sympify(_normalize_input_str(str(target_raw))))
             if abs(val - target) <= question.tolerance:
                 return True, "✓ Correct!"
-            return False, f"Numerical value is incorrect (got {val:.4f}). Try again or type 'hint'."
+            return (
+                False,
+                f"Numerical value is incorrect (got {val:.4f}). Try again or type 'hint'.",
+            )
         except Exception as e:  # noqa: BLE001
             return False, f"Could not parse numerical value: {e}"
 
@@ -148,7 +159,11 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
             user_expr = safe_sympify(norm, locals_dict={"C": c_sym, "c": c_lower})
             var = sp.Symbol(question.variable)
 
-            target_raw = question.correct_value if question.correct_value is not None else question.expected_answer
+            target_raw = (
+                question.correct_value
+                if question.correct_value is not None
+                else question.expected_answer
+            )
             if isinstance(target_raw, str):
                 target_norm = re.sub(r"\s*\+\s*[cC]$", "", target_raw.strip())
             else:
@@ -163,13 +178,21 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
                         return True, "✓ Correct!"
                 except (TypeError, ValueError):
                     pass
-                return False, "Calculated definite integral is incorrect. Try again or type 'hint'."
+                return (
+                    False,
+                    "Calculated definite integral is incorrect. Try again or type 'hint'.",
+                )
 
             # Indefinite integral: derivative of difference with respect to var must be 0
-            target_expr = safe_sympify(target_norm, locals_dict={"C": c_sym, "c": c_lower})
+            target_expr = safe_sympify(
+                target_norm, locals_dict={"C": c_sym, "c": c_lower}
+            )
             diff_wrt_var = sp.diff(user_expr - target_expr, var)
             if sp.simplify(diff_wrt_var) == 0:
-                return True, "✓ Correct! (Antiderivative is equivalent up to an additive constant)"
+                return (
+                    True,
+                    "✓ Correct! (Antiderivative is equivalent up to an additive constant)",
+                )
             return False, "Antiderivative does not match. Try again or type 'hint'."
         except Exception as e:  # noqa: BLE001
             return False, f"Syntax error in mathematical expression: {e}"
@@ -178,7 +201,11 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
         try:
             norm = _normalize_input_str(raw)
             user_expr = safe_sympify(norm)
-            target_raw = question.correct_value if question.correct_value is not None else question.expected_answer
+            target_raw = (
+                question.correct_value
+                if question.correct_value is not None
+                else question.expected_answer
+            )
             target = safe_sympify(str(target_raw))
             if sp.simplify(user_expr - target) == 0:
                 return True, "✓ Correct!"
@@ -207,7 +234,9 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
             expr = a * fn(x)
             ans = sp.diff(expr, x)
             prompt = f"Find the derivative f'(x) for f(x) = {expr}"
-            hint = f"Recall the derivative of {fn.__name__}(x) and factor out constants."
+            hint = (
+                f"Recall the derivative of {fn.__name__}(x) and factor out constants."
+            )
 
     elif difficulty == "medium":
         choice = rng.choice(["product", "chain_exp", "chain_trig"])
@@ -594,9 +623,7 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
         )
     d1, d2, d3 = rng.randint(2, 5), rng.randint(2, 5), rng.randint(2, 5)
     det_val = d1 * d2 * d3
-    prompt = (
-        f"Find the determinant of upper-triangular matrix A = [[{d1}, 3, 1], [0, {d2}, 4], [0, 0, {d3}]]"
-    )
+    prompt = f"Find the determinant of upper-triangular matrix A = [[{d1}, 3, 1], [0, {d2}, 4], [0, 0, {d3}]]"
     hint = "For any triangular matrix, determinant equals the product of its diagonal entries."
     steps = [
         "Matrix is upper triangular (all entries below diagonal are 0)",
@@ -709,7 +736,9 @@ def _gen_stats_question(difficulty: str, rng: random.Random) -> PracticeQuestion
     sorted_vals = sorted(vals)
     median_val = (sorted_vals[2] + sorted_vals[3]) / 2.0
     prompt = f"Find the median of the 6-element dataset: {vals}"
-    hint = "For an even sample size, the median is the average of the two middle elements."
+    hint = (
+        "For an even sample size, the median is the average of the two middle elements."
+    )
     steps = [
         f"Original dataset: {vals}",
         f"Sorted dataset: {sorted_vals}",
@@ -798,8 +827,12 @@ class PracticeSession:
         """Runs the interactive practice session."""
         self.print_func("=" * 60)
         self.print_func("  MathStore University Practice & Revision Quizzer")
-        self.print_func(f"  Topic: {self.topic.capitalize()} | Difficulty: {self.difficulty.capitalize()} | Questions: {self.count}")
-        self.print_func("  Commands: 'hint' for a hint, 'skip' to reveal solution, 'quit' to exit.")
+        self.print_func(
+            f"  Topic: {self.topic.capitalize()} | Difficulty: {self.difficulty.capitalize()} | Questions: {self.count}"
+        )
+        self.print_func(
+            "  Commands: 'hint' for a hint, 'skip' to reveal solution, 'quit' to exit."
+        )
         self.print_func("=" * 60)
 
         score = 0
@@ -813,7 +846,9 @@ class PracticeSession:
                 rng=self.rng,
             )
 
-            self.print_func(f"\n[Question {i}/{self.count}] ({q.topic.capitalize()} - {q.difficulty})")
+            self.print_func(
+                f"\n[Question {i}/{self.count}] ({q.topic.capitalize()} - {q.difficulty})"
+            )
             self.print_func(f"  {q.prompt}")
 
             attempts = 0
@@ -827,7 +862,9 @@ class PracticeSession:
                         "completed": completed,
                         "correct": score,
                         "skipped": skipped,
-                        "percentage": (score / max(1, completed)) * 100 if completed else 0.0,
+                        "percentage": (score / max(1, completed)) * 100
+                        if completed
+                        else 0.0,
                     }
 
                 if user_resp.lower() == "quit":
@@ -838,7 +875,9 @@ class PracticeSession:
                         "completed": completed,
                         "correct": score,
                         "skipped": skipped,
-                        "percentage": (score / max(1, completed)) * 100 if completed else 0.0,
+                        "percentage": (score / max(1, completed)) * 100
+                        if completed
+                        else 0.0,
                     }
 
                 if user_resp.lower() == "hint":
@@ -846,7 +885,9 @@ class PracticeSession:
                     continue
 
                 if user_resp.lower() == "skip":
-                    self.print_func(f"  ⏭ Skipped. Expected answer: {q.expected_answer}")
+                    self.print_func(
+                        f"  ⏭ Skipped. Expected answer: {q.expected_answer}"
+                    )
                     self.print_func("  Step-by-step solution:")
                     for idx, s in enumerate(q.steps, 1):
                         self.print_func(f"    {idx}. {s}")
@@ -893,7 +934,11 @@ class PracticeSession:
         if pct >= 80.0:
             self.print_func("  🌟 Outstanding! You have mastered these concepts.")
         elif pct >= 60.0:
-            self.print_func("  👍 Good effort! Review the tricky derivations and try again.")
+            self.print_func(
+                "  👍 Good effort! Review the tricky derivations and try again."
+            )
         else:
-            self.print_func("  📚 Keep revising! Use 'mathstore ref' to consult cheat sheets.")
+            self.print_func(
+                "  📚 Keep revising! Use 'mathstore ref' to consult cheat sheets."
+            )
         self.print_func("=" * 60)

@@ -23,7 +23,7 @@ def create_app() -> FastAPI:
             "linear algebra, probability, statistics, reference cheat sheets, and active-recall practice."
         ),
         version="0.1.1a2",
-        root_path="/math"
+        root_path="/math",
     )
 
     # Enable CORS for cross-origin and remote frontend calling
@@ -51,7 +51,6 @@ def create_app() -> FastAPI:
     @app.get("/health", summary="Global health check", include_in_schema=False)
     def global_health() -> dict[str, Any]:
         return {"status": "ok", "service": "mathstore", "version": app.version}
-
 
     return app
 

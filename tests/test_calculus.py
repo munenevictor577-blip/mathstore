@@ -160,7 +160,9 @@ class TestCalculusAnalyzer:
         lim_res = analyzer.get_limit("2^x sin x", limits=0)
         assert lim_res == "0"
 
-    def test_natural_text_implicit_multiplication_and_powers(self, analyzer: CalculusAnalyzer):
+    def test_natural_text_implicit_multiplication_and_powers(
+        self, analyzer: CalculusAnalyzer
+    ):
         """Verify normal text with implicit multiplication, caret powers, and e^x."""
         assert analyzer.differentiate("2x + 4") == "2"
         assert analyzer.differentiate("x^2") == "2*x"
@@ -180,4 +182,3 @@ class TestCalculusAnalyzer:
         assert expr == sp.sympify("2**x * sin(x)")
         expr2 = analyzer.parse_expression("e^(2x)")
         assert expr2 == sp.exp(2 * sp.Symbol("x"))
-

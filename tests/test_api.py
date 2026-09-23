@@ -1,8 +1,8 @@
-import pytest
 import runpy
 import sys
 from unittest.mock import patch
 
+import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
@@ -69,7 +69,12 @@ class TestCalculusAPI:
     """Tests for /math calculus endpoints."""
 
     def test_diff_post(self, client: TestClient):
-        payload = {"expression": "x**3 + 2*x", "variable": "x", "order": 1, "steps": True}
+        payload = {
+            "expression": "x**3 + 2*x",
+            "variable": "x",
+            "order": 1,
+            "steps": True,
+        }
         res = client.post("/math/diff", json=payload)
         assert res.status_code == 200
         data = res.json()
@@ -307,15 +312,21 @@ class TestStatisticsAPI:
         assert exc_poisson.value.status_code == 400
 
     def test_stats_confidence_interval_non_str_and_error(self, client: TestClient):
-        res_latex = client.post("/math/stats/ci", json={"data": [10.0, 12.0, 14.0], "format": "latex"})
+        res_latex = client.post(
+            "/math/stats/ci", json={"data": [10.0, 12.0, 14.0], "format": "latex"}
+        )
         assert res_latex.status_code == 200
         assert res_latex.json()["format"] == "latex"
 
-        res_err = client.post("/math/stats/ci", json={"data": "abc", "confidence": 0.95})
+        res_err = client.post(
+            "/math/stats/ci", json={"data": "abc", "confidence": 0.95}
+        )
         assert res_err.status_code == 400
 
     def test_stats_ttest_error(self, client: TestClient):
-        res = client.post("/math/stats/ttest", json={"data": "not_numeric", "pop_mean": 10.0})
+        res = client.post(
+            "/math/stats/ttest", json={"data": "not_numeric", "pop_mean": 10.0}
+        )
         assert res.status_code == 400
 
 
@@ -337,7 +348,9 @@ class TestStudyStepsAndPracticeAPI:
         assert res.status_code == 200
         assert len(res.json()["steps"]) >= 3
 
-        res_get = client.get("/math/steps/integrate?expression=x**2&lower_limit=0&upper_limit=2")
+        res_get = client.get(
+            "/math/steps/integrate?expression=x**2&lower_limit=0&upper_limit=2"
+        )
         assert res_get.status_code == 200
 
     def test_steps_solve(self, client: TestClient):
@@ -404,17 +417,16 @@ class TestStudyStepsAndPracticeAPI:
         res_eq = client.post("/math/steps/solve", json={"equation": "+++"})
         assert res_eq.status_code == 400
 
+
 @patch("uvicorn.run")
 def test_api_run_function(mock_uvicorn_run):
     """Hits the run() function with custom arguments."""
     run(host="127.0.0.1", port=9000, reload=True)
-    
+
     mock_uvicorn_run.assert_called_once_with(
-        "mathstore.api.main:app", 
-        host="127.0.0.1", 
-        port=9000, 
-        reload=True
+        "mathstore.api.main:app", host="127.0.0.1", port=9000, reload=True
     )
+
 
 @patch("uvicorn.run")
 def test_api_main_execution_block(mock_uvicorn_run):
@@ -422,11 +434,8 @@ def test_api_main_execution_block(mock_uvicorn_run):
     # Temporarily remove mathstore.api.main from sys.modules to prevent RuntimeWarning
     sys.modules.pop("mathstore.api.main", None)
     runpy.run_module("mathstore.api.main", run_name="__main__")
-    
+
     # Verifies the default arguments were passed via the main block
     mock_uvicorn_run.assert_called_once_with(
-        "mathstore.api.main:app", 
-        host="0.0.0.0", 
-        port=8000, 
-        reload=False
+        "mathstore.api.main:app", host="0.0.0.0", port=8000, reload=False
     )

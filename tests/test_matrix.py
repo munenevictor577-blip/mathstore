@@ -63,6 +63,7 @@ class TestMatrixAnalyzer:
 
         # Line 51: literal_eval with empty list "[]"
         import warnings
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             mat_analyzer.parse_matrix("[]")

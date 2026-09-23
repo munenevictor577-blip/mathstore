@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, patch
+
 import pytest
 import sympy as sp
 
@@ -167,7 +168,15 @@ class TestIntegralSteps:
         assert format_integral_rule(alt_empty) == ["No standard elementary rule found."]
 
         # Lines 167-169 & 173-175: AlternativeRule with alternatives and ConstantRule
-        const_rule = type("ConstantRule", (), {"integrand": 5, "variable": sp.Symbol("x"), "eval": lambda self: 5 * sp.Symbol("x")})()
+        const_rule = type(
+            "ConstantRule",
+            (),
+            {
+                "integrand": 5,
+                "variable": sp.Symbol("x"),
+                "eval": lambda self: 5 * sp.Symbol("x"),
+            },
+        )()
         alt_with_sub = type("AlternativeRule", (), {"alternatives": [const_rule]})()
         assert len(format_integral_rule(alt_with_sub)) > 0
 
@@ -180,15 +189,21 @@ class TestIntegralSteps:
         assert any("csc(" in s for s in format_integral_rule(csc_rule))
 
         # Lines 229-231: hasattr substep
-        sub_rule = type("SubstepRule", (), {"substep": sec_rule, "integrand": "sec(x)^2"})()
+        sub_rule = type(
+            "SubstepRule", (), {"substep": sec_rule, "integrand": "sec(x)^2"}
+        )()
         assert len(format_integral_rule(sub_rule)) > 0
 
         # Lines 232-233: hasattr eval
-        eval_rule = type("EvalRule", (), {"eval": lambda self: sp.Symbol("x"), "integrand": "x"})()
+        eval_rule = type(
+            "EvalRule", (), {"eval": lambda self: sp.Symbol("x"), "integrand": "x"}
+        )()
         assert any("Evaluate integral" in s for s in format_integral_rule(eval_rule))
 
         # Lines 234-238: direct integration fallback
-        direct_rule = type("DirectRule", (), {"variable": sp.Symbol("x"), "integrand": sp.Symbol("x")})()
+        direct_rule = type(
+            "DirectRule", (), {"variable": sp.Symbol("x"), "integrand": sp.Symbol("x")}
+        )()
         assert any("Direct integration" in s for s in format_integral_rule(direct_rule))
 
     def test_integral_steps_dontknow_and_exception(self):
@@ -199,7 +214,10 @@ class TestIntegralSteps:
             steps = get_integral_steps("x**2", variable="x")
             assert any("general integration algorithms" in s for s in steps)
 
-        with patch("mathstore.study.steps.integral_steps", side_effect=RuntimeError("SymPy error")):
+        with patch(
+            "mathstore.study.steps.integral_steps",
+            side_effect=RuntimeError("SymPy error"),
+        ):
             steps = get_integral_steps("x**2", variable="x")
             assert any("symbolic integration" in s for s in steps)
 

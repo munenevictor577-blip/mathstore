@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import re
+from tokenize import TokenError
 from typing import Any
 
 import sympy as sp
+from sympy.core.sympify import SympifyError
 from sympy.parsing.sympy_parser import (
     convert_xor,
     function_exponentiation,
@@ -53,7 +55,9 @@ def safe_sympify(
 
     for pat in DANGEROUS_PATTERNS:
         if re.search(pat, raw, flags=re.IGNORECASE):
-            raise ValueError("Invalid or unsafe expression: forbidden pattern detected.")
+            raise ValueError(
+                "Invalid or unsafe expression: forbidden pattern detected."
+            )
 
     # Normalize mathematical symbols
     cleaned = raw.replace("·", "*").replace("×", "*")
@@ -79,9 +83,13 @@ def safe_sympify(
         locs.update(locals_dict)
 
     try:
-        return parse_expr(cleaned, local_dict=locs, transformations=CALCULUS_TRANSFORMATIONS)
-    except Exception:
+        return parse_expr(
+            cleaned, local_dict=locs, transformations=CALCULUS_TRANSFORMATIONS
+        )
+    except (SympifyError, SyntaxError, ValueError, TokenError, TypeError):
         try:
             return sp.sympify(cleaned, locals=locs)
-        except Exception as e:
-            raise ValueError(f"Failed to parse mathematical expression '{text}': {e}") from e
+        except (SympifyError, SyntaxError, ValueError, TokenError, TypeError) as e:
+            raise ValueError(
+                f"Failed to parse mathematical expression '{text}': {e}"
+            ) from e

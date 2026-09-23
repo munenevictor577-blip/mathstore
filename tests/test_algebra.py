@@ -91,7 +91,9 @@ class TestEquationSolver:
 
     def test_simplify_expression_invalid_syntax(self, solver: EquationSolver):
         """Raise error when invalid syntax is passed to simplify_expression."""
-        with pytest.raises(ValueError, match="Failed to parse or simplify the expression"):
+        with pytest.raises(
+            ValueError, match="Failed to parse or simplify the expression"
+        ):
             solver.simplify_expression("x +* 2")
 
     def test_format_solution_single(self, solver: EquationSolver):
@@ -113,4 +115,3 @@ class TestEquationSolver:
         """Test formatting for no solutions."""
         assert solver.format_solution([], "x", format="latex") == r"\emptyset"
         assert solver.format_solution([], "x", format="pretty") == "No solution (∅)"
-

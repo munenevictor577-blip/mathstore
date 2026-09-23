@@ -152,11 +152,15 @@ def poisson_dist_get(
     response_model=ConfidenceIntervalResponse,
     summary="Confidence interval for sample mean",
 )
-def confidence_interval_post(req: ConfidenceIntervalRequest) -> ConfidenceIntervalResponse:
+def confidence_interval_post(
+    req: ConfidenceIntervalRequest,
+) -> ConfidenceIntervalResponse:
     """Computes confidence interval for sample mean using Student's t distribution."""
     try:
         data_str = _format_data_input(req.data)
-        res = analyzer.confidence_interval(data_str, confidence=req.confidence, format=req.format)
+        res = analyzer.confidence_interval(
+            data_str, confidence=req.confidence, format=req.format
+        )
         if req.format == "str":
             lower, upper, margin = res
             return ConfidenceIntervalResponse(

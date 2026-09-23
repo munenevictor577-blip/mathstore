@@ -12,7 +12,9 @@ router = APIRouter(tags=["Algebra"])
 solver = EquationSolver()
 
 
-@router.post("/solve", response_model=SolveResponse, summary="Solve an algebraic equation")
+@router.post(
+    "/solve", response_model=SolveResponse, summary="Solve an algebraic equation"
+)
 def solve_post(req: SolveRequest) -> SolveResponse:
     """Solves linear and polynomial equations with optional step-by-step breakdown."""
     try:
@@ -37,7 +39,9 @@ def solve_post(req: SolveRequest) -> SolveResponse:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
-@router.get("/solve", response_model=SolveResponse, summary="Solve an equation (GET query)")
+@router.get(
+    "/solve", response_model=SolveResponse, summary="Solve an equation (GET query)"
+)
 def solve_get(
     equation: str = Query(..., description="Equation to solve (e.g. 2*x + 4 = 10)"),
     variable: str = Query("x", description="Variable to isolate"),
@@ -54,7 +58,11 @@ def solve_get(
     )
 
 
-@router.post("/simplify", response_model=SimplifyResponse, summary="Simplify an algebraic expression")
+@router.post(
+    "/simplify",
+    response_model=SimplifyResponse,
+    summary="Simplify an algebraic expression",
+)
 def simplify_post(req: SimplifyRequest) -> SimplifyResponse:
     """Simplifies mathematical expressions."""
     try:
@@ -67,7 +75,9 @@ def simplify_post(req: SimplifyRequest) -> SimplifyResponse:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
-@router.get("/simplify", response_model=SimplifyResponse, summary="Simplify (GET query)")
+@router.get(
+    "/simplify", response_model=SimplifyResponse, summary="Simplify (GET query)"
+)
 def simplify_get(
     expression: str = Query(..., description="Expression to simplify"),
 ) -> SimplifyResponse:

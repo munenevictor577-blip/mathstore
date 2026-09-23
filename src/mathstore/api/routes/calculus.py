@@ -14,12 +14,18 @@ router = APIRouter(tags=["Calculus"])
 analyzer = CalculusAnalyzer()
 
 
-@router.post("/diff", response_model=DiffResponse, summary="Differentiate a mathematical expression")
+@router.post(
+    "/diff",
+    response_model=DiffResponse,
+    summary="Differentiate a mathematical expression",
+)
 def differentiate_post(req: DiffRequest) -> DiffResponse:
     """Calculates the nth derivative of an algebraic expression with optional steps."""
     try:
         steps_list = (
-            analyzer.differentiate_steps(req.expression, variable=req.variable, order=req.order)
+            analyzer.differentiate_steps(
+                req.expression, variable=req.variable, order=req.order
+            )
             if req.steps
             else None
         )
@@ -57,12 +63,16 @@ def differentiate_get(
     )
 
 
-@router.post("/integrate", response_model=IntegrateResponse, summary="Integrate an expression")
+@router.post(
+    "/integrate", response_model=IntegrateResponse, summary="Integrate an expression"
+)
 def integrate_post(req: IntegrateRequest) -> IntegrateResponse:
     """Calculates indefinite or definite integrals with optional step derivations."""
     try:
         steps_list = (
-            analyzer.integrate_steps(req.expression, variable=req.variable, limits=req.limits)
+            analyzer.integrate_steps(
+                req.expression, variable=req.variable, limits=req.limits
+            )
             if req.steps
             else None
         )
@@ -81,16 +91,26 @@ def integrate_post(req: IntegrateRequest) -> IntegrateResponse:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
-@router.get("/integrate", response_model=IntegrateResponse, summary="Integrate (GET query)")
+@router.get(
+    "/integrate", response_model=IntegrateResponse, summary="Integrate (GET query)"
+)
 def integrate_get(
     expression: str = Query(..., description="Expression to integrate"),
     variable: str = Query("x", description="Variable of integration"),
-    lower_limit: float | None = Query(None, description="Lower bound for definite integral"),
-    upper_limit: float | None = Query(None, description="Upper bound for definite integral"),
+    lower_limit: float | None = Query(
+        None, description="Lower bound for definite integral"
+    ),
+    upper_limit: float | None = Query(
+        None, description="Upper bound for definite integral"
+    ),
     steps: bool = Query(False, description="Include steps"),
     format: str = Query("str", description="Output format"),
 ) -> IntegrateResponse:
-    limits = (lower_limit, upper_limit) if lower_limit is not None and upper_limit is not None else None
+    limits = (
+        (lower_limit, upper_limit)
+        if lower_limit is not None and upper_limit is not None
+        else None
+    )
     return integrate_post(
         IntegrateRequest(
             expression=expression,
@@ -120,7 +140,9 @@ def limit_post(req: LimitRequest) -> LimitResponse:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
-@router.get("/limit", response_model=LimitResponse, summary="Evaluate a limit (GET query)")
+@router.get(
+    "/limit", response_model=LimitResponse, summary="Evaluate a limit (GET query)"
+)
 def limit_get(
     expression: str = Query(..., description="Expression to evaluate"),
     target: str = Query(..., description="Target value, e.g. 0, oo, -oo"),

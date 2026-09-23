@@ -66,7 +66,9 @@ class MatrixAnalyzer:
                                 if part.strip()
                             ]
                             if not items:
-                                raise ValueError("Encountered an empty row in matrix input.")
+                                raise ValueError(
+                                    "Encountered an empty row in matrix input."
+                                )
                             data.append(items)
                         mat = sp.Matrix(data)
                         if mat.rows == 0 or mat.cols == 0:
@@ -97,7 +99,9 @@ class MatrixAnalyzer:
             except Exception as e:  # noqa: BLE001
                 raise ValueError(f"Failed to parse matrix string '{matrix_input}': {e}")
 
-        raise ValueError(f"Unsupported matrix input type: {type(matrix_input).__name__}")
+        raise ValueError(
+            f"Unsupported matrix input type: {type(matrix_input).__name__}"
+        )
 
     def _format_expr(self, expr: Any, format: str = "str") -> str:
         """Format an expression or matrix into str, latex, or pretty format."""
@@ -136,7 +140,9 @@ class MatrixAnalyzer:
             )
         det = mat.det()
         if det == 0:
-            raise ValueError("Matrix is singular (determinant = 0) and cannot be inverted.")
+            raise ValueError(
+                "Matrix is singular (determinant = 0) and cannot be inverted."
+            )
 
         inv_mat = mat.inv()
         return self._format_expr(inv_mat, format=format)
@@ -151,9 +157,7 @@ class MatrixAnalyzer:
         if format == "latex":
             return f"\\text{{RREF}} = {sp.latex(rref_mat)}, \\quad \\text{{Pivots}} = {pivots}"
         if format == "pretty":
-            return (
-                f"RREF:\n{sp.pretty(rref_mat, use_unicode=True)}\nPivot columns: {list(pivots)}"
-            )
+            return f"RREF:\n{sp.pretty(rref_mat, use_unicode=True)}\nPivot columns: {list(pivots)}"
         return f"RREF:\n{rref_mat}\nPivot columns: {list(pivots)}"
 
     def eigenvalues(self, matrix_input: Any, format: str = "str") -> str:
