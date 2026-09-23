@@ -1,6 +1,6 @@
 [project]
 name = "mathstore"
-version = "0.1.0"
+version = "0.1.1a1"
 description = "A clean, modular mathematical toolkit."
 readme = "README.md"
 license = { text = "MIT" }
