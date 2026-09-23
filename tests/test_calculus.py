@@ -46,6 +46,11 @@ class TestCalculusAnalyzer:
         with pytest.raises(ValueError, match="Calculus error during differentiation"):
             analyzer.differentiate("sin(")
 
+    def test_calculus_blocks_injection(self, analyzer: CalculusAnalyzer):
+        """Verify that code injection attempts in expressions are blocked."""
+        with pytest.raises(ValueError):
+            analyzer.differentiate("__import__('os').system('echo')")
+
     def test_integrate_indefinite_polynomial(self, analyzer: CalculusAnalyzer):
         """Compute indefinite integral for polynomials."""
         assert analyzer.integrate("x**2") == "x**3/3"

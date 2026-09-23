@@ -64,6 +64,11 @@ class TestEquationSolver:
         with pytest.raises(ValueError, match="Failed to parse or solve the equation"):
             solver.solve_linear("2*x + = 10")
 
+    def test_solver_blocks_injection(self, solver: EquationSolver):
+        """Verify that code injection attempts in equations are blocked."""
+        with pytest.raises(ValueError):
+            solver.solve_linear("__import__('os').system('echo') = 0")
+
     def test_simplify_expression_linear(self, solver: EquationSolver):
         """Simplify simple algebraic combinations."""
         simplified = solver.simplify_expression("2*x + 3*x")
