@@ -5,6 +5,7 @@ import sys
 from mathstore.algebra.solver import EquationSolver
 from mathstore.calculus.analyzer import CalculusAnalyzer
 from mathstore.core.matrix import MatrixAnalyzer
+from mathstore.ode.solver import ODESolver
 from mathstore.reference import get_reference, list_topics_formatted
 from mathstore.statistics.analyzer import StatsAnalyzer
 
@@ -192,6 +193,56 @@ def main():
         help="Random seed for reproducible question generation",
     )
 
+    ode_p = subparsers.add_parser(
+        "ode", help="Solve, classify, or verify ordinary differential equations"
+    )
+    ode_p.add_argument(
+        "equation",
+        type=str,
+        help="Differential equation (e.g. \"y' + 2*y = exp(x)\" or \"y'' + 4*y = 0\")",
+    )
+    ode_p.add_argument(
+        "--ics",
+        type=str,
+        default=None,
+        help="Initial conditions (e.g. \"y(0)=1, y'(0)=2\")",
+    )
+    ode_p.add_argument(
+        "--var",
+        type=str,
+        default="x",
+        help="Independent variable (default: x)",
+    )
+    ode_p.add_argument(
+        "--func",
+        type=str,
+        default="y",
+        help="Dependent variable / function name (default: y)",
+    )
+    ode_p.add_argument(
+        "--classify",
+        action="store_true",
+        help="Classify the ODE instead of solving",
+    )
+    ode_p.add_argument(
+        "--check",
+        type=str,
+        default=None,
+        help="Verify if candidate solution satisfies the ODE",
+    )
+    ode_p.add_argument(
+        "--hint",
+        type=str,
+        default="default",
+        help="Optional SymPy solving hint (default: default)",
+    )
+    ode_p.add_argument(
+        "--latex", action="store_true", help="Output solution in LaTeX format"
+    )
+    ode_p.add_argument(
+        "--pretty", action="store_true", help="Output solution in pretty Unicode format"
+    )
+
     args = parser.parse_args()
 
     try:
@@ -358,6 +409,43 @@ def main():
                     seed=args.seed,
                 )
                 session.run()
+
+        elif args.command == "ode":
+            ode_solver = ODESolver(default_var=args.var, default_func=args.func)
+            if args.check:
+                is_valid = ode_solver.check_solution(
+                    args.equation, args.check, var=args.var, func=args.func
+                )
+                if is_valid:
+                    print(
+                        f"Verified: '{args.check}' is a valid solution to '{args.equation}'."
+                    )
+                else:
+                    print(
+                        f"Verification failed: '{args.check}' does not satisfy '{args.equation}'."
+                    )
+            elif args.classify:
+                info = ode_solver.classify(args.equation, var=args.var, func=args.func)
+                print(f"ODE Classification for '{args.equation}':")
+                print(f"  Order:        {info['order']}")
+                print(f"  Linear:       {info['is_linear']}")
+                print(f"  Homogeneous:  {info['is_homogeneous']}")
+                print(f"  Primary Type: {info['primary_type']}")
+                if info["hints"]:
+                    print(f"  Solver Hints: {', '.join(info['hints'][:5])}")
+            else:
+                sol = ode_solver.solve(
+                    args.equation,
+                    ics=args.ics,
+                    var=args.var,
+                    func=args.func,
+                    hint=args.hint,
+                    format=fmt,
+                )
+                if fmt == "str":
+                    print(f"Solution: {sol}")
+                else:
+                    print(sol)
 
     except Exception as e:  # noqa: BLE001
         print(f"Error executing '{args.command}' : {e}", file=sys.stderr)

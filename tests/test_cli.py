@@ -432,5 +432,59 @@ class TestCLI:
         assert "MathStore University Practice & Revision Quizzer" in captured
         assert "Exiting practice session early" in captured
 
+    def test_cli_ode_solve(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test ode subcommand default solving."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "ode", "y' + 2*y = exp(x)"])
+        main()
+        captured = capsys.readouterr().out
+        assert "Solution:" in captured
+        assert "exp(-2*x)" in captured
+
+    def test_cli_ode_solve_ivp(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test ode subcommand with initial conditions."""
+        monkeypatch.setattr(
+            sys, "argv", ["mathstore", "ode", "y'' + 4*y = 0", "--ics", "y(0)=1, y'(0)=2"]
+        )
+        main()
+        captured = capsys.readouterr().out
+        assert "sin(2*x)" in captured
+        assert "cos(2*x)" in captured
+
+    def test_cli_ode_classify(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test ode subcommand with --classify flag."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "ode", "y' = 2*x*y", "--classify"])
+        main()
+        captured = capsys.readouterr().out
+        assert "ODE Classification for 'y' = 2*x*y':" in captured
+        assert "Order:        1" in captured
+        assert "Primary Type: Separable First-Order ODE" in captured
+
+    def test_cli_ode_check(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test ode subcommand with --check flag."""
+        monkeypatch.setattr(
+            sys, "argv", ["mathstore", "ode", "y' + 2*y = 0", "--check", "3*exp(-2*x)"]
+        )
+        main()
+        captured = capsys.readouterr().out
+        assert "Verified: '3*exp(-2*x)' is a valid solution" in captured
+
+        # Invalid check
+        monkeypatch.setattr(
+            sys, "argv", ["mathstore", "ode", "y' + 2*y = 0", "--check", "3*exp(2*x)"]
+        )
+        main()
+        captured = capsys.readouterr().out
+        assert "Verification failed:" in captured
+
+    def test_cli_ode_error(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test ode subcommand error handling."""
+        monkeypatch.setattr(sys, "argv", ["mathstore", "ode", "2*x + 4 = 10"])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr().err
+        assert "Error executing 'ode'" in captured
+
+
 
 

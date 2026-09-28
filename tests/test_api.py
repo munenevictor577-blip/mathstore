@@ -336,3 +336,87 @@ class TestStudyStepsAndPracticeAPI:
 
         res_404 = client.get("/math/ref/nonexistent_topic")
         assert res_404.status_code == 404
+
+
+class TestODEAPI:
+    """Tests for /math/ode endpoints."""
+
+    def test_ode_solve_post(self, client: TestClient):
+        # General solution
+        res = client.post("/math/ode/solve", json={"equation": "y' + 2*y = exp(x)"})
+        assert res.status_code == 200
+        data = res.json()
+        assert "solution" in data
+        assert "exp(-2*x)" in data["solution"]
+
+        # IVP solution
+        res_ivp = client.post(
+            "/math/ode/solve",
+            json={"equation": "y'' + 4*y = 0", "ics": "y(0)=1, y'(0)=2"},
+        )
+        assert res_ivp.status_code == 200
+        data_ivp = res_ivp.json()
+        assert "sin(2*x)" in data_ivp["solution"]
+        assert "cos(2*x)" in data_ivp["solution"]
+
+    def test_ode_solve_get(self, client: TestClient):
+        res = client.get(
+            "/math/ode/solve",
+            params={"equation": "y' + 2*y = 0", "ics": "y(0)=3"},
+        )
+        assert res.status_code == 200
+        assert "3*exp(-2*x)" in res.json()["solution"]
+
+    def test_ode_classify_post_and_get(self, client: TestClient):
+        # POST
+        res_post = client.post(
+            "/math/ode/classify",
+            json={"equation": "y' = 2*x*y"},
+        )
+        assert res_post.status_code == 200
+        data_post = res_post.json()
+        assert data_post["order"] == 1
+        assert "Separable" in data_post["primary_type"]
+
+        # GET
+        res_get = client.get(
+            "/math/ode/classify",
+            params={"equation": "y'' + 4*y = 0"},
+        )
+        assert res_get.status_code == 200
+        data_get = res_get.json()
+        assert data_get["order"] == 2
+        assert data_get["is_linear"] is True
+        assert data_get["is_homogeneous"] is True
+
+    def test_ode_check_post_and_get(self, client: TestClient):
+        # POST valid
+        res_valid = client.post(
+            "/math/ode/check",
+            json={"equation": "y' + 2*y = 0", "solution": "3*exp(-2*x)"},
+        )
+        assert res_valid.status_code == 200
+        assert res_valid.json()["is_valid"] is True
+
+        # POST invalid
+        res_invalid = client.post(
+            "/math/ode/check",
+            json={"equation": "y' + 2*y = 0", "solution": "3*exp(2*x)"},
+        )
+        assert res_invalid.status_code == 200
+        assert res_invalid.json()["is_valid"] is False
+
+        # GET valid
+        res_get = client.get(
+            "/math/ode/check",
+            params={"equation": "y' + 2*y = 0", "solution": "3*exp(-2*x)"},
+        )
+        assert res_get.status_code == 200
+        assert res_get.json()["is_valid"] is True
+
+    def test_ode_error_handling(self, client: TestClient):
+        # Non-differential equation
+        res = client.post("/math/ode/solve", json={"equation": "2*x + 4 = 10"})
+        assert res.status_code == 400
+        assert "contains no derivatives" in res.json()["detail"]
+

@@ -249,3 +249,61 @@ class ReferenceResponse(BaseModel):
     topic: str
     content: str
     latex: bool
+
+
+# --- ODE Schemas ---
+class ODESolveRequest(BaseModel):
+    equation: str = Field(
+        ...,
+        description="Ordinary differential equation, e.g. \"y' + 2*y = exp(x)\" or \"y'' + 4*y = 0\"",
+    )
+    ics: str | None = Field(
+        None,
+        description="Optional initial conditions, e.g. \"y(0) = 1, y'(0) = 2\"",
+    )
+    variable: str = Field("x", description="Independent variable name (default: 'x')")
+    function: str = Field("y", description="Dependent function name (default: 'y')")
+    hint: str = Field("default", description="Optional SymPy solving hint (default: 'default')")
+    format: str = Field("str", description="Output format: 'str', 'latex', 'pretty', or 'rhs'")
+
+
+class ODESolveResponse(BaseModel):
+    equation: str
+    variable: str
+    function: str
+    solution: str | list[str]
+    format: str
+    ics: str | None = None
+
+
+class ODEClassifyRequest(BaseModel):
+    equation: str = Field(..., description="Differential equation to classify")
+    variable: str = Field("x", description="Independent variable name (default: 'x')")
+    function: str = Field("y", description="Dependent function name (default: 'y')")
+
+
+class ODEClassifyResponse(BaseModel):
+    equation: str
+    variable: str
+    function: str
+    order: int
+    is_linear: bool
+    is_homogeneous: bool
+    hints: list[str]
+    primary_type: str
+
+
+class ODECheckRequest(BaseModel):
+    equation: str = Field(..., description="Original differential equation")
+    solution: str = Field(..., description="Candidate solution expression to verify")
+    variable: str = Field("x", description="Independent variable name (default: 'x')")
+    function: str = Field("y", description="Dependent function name (default: 'y')")
+
+
+class ODECheckResponse(BaseModel):
+    equation: str
+    solution: str
+    variable: str
+    function: str
+    is_valid: bool
+
