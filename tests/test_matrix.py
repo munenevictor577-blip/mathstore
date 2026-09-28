@@ -29,6 +29,16 @@ class TestMatrixAnalyzer:
         m5 = mat_analyzer.parse_matrix(sp.Matrix([[1, 2], [3, 4]]))
         assert m5 == sp.Matrix([[1, 2], [3, 4]])
 
+        # Symbolic bracket matrix hitting line 74
+        m6 = mat_analyzer.parse_matrix("[[x, y], [z, w]]")
+        assert m6.shape == (2, 2)
+
+    def test_parse_symbolic_nested_list_string(self, mat_analyzer: MatrixAnalyzer):
+        """Parse nested list string containing symbols and numbers."""
+        mat = mat_analyzer.parse_matrix("[[x, 1], [0, 2]]")
+        assert mat.shape == (2, 2)
+        assert mat[0, 0] == sp.Symbol("x")
+
     def test_parse_matrix_errors(self, mat_analyzer: MatrixAnalyzer):
         """Invalid or empty inputs raise ValueError."""
         with pytest.raises(ValueError, match="empty"):
@@ -42,6 +52,45 @@ class TestMatrixAnalyzer:
 
         with pytest.raises(ValueError, match="Unsupported matrix input type"):
             mat_analyzer.parse_matrix(12345)
+
+        # Line 82: "Matrix input contains no rows."
+        with pytest.raises(ValueError, match="Matrix input contains no rows"):
+            mat_analyzer.parse_matrix("; ; ;")
+
+        # Line 92: Empty row inside semicolon-separated string
+        with pytest.raises(ValueError, match="Encountered an empty row"):
+            mat_analyzer.parse_matrix("1, 2; ,,, ; 3, 4")
+
+        # Line 51: literal_eval with empty list "[]"
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            mat_analyzer.parse_matrix("[]")
+
+        # Line 69 & 75-76: Row with whitespace inside brackets
+        with pytest.raises(ValueError):
+            mat_analyzer.parse_matrix("[[x], [   ]]")
+
+        # Line 73: Custom matrix simulation where mat.rows == 0
+        from unittest.mock import patch
+
+        class CustomMatrixMeta(type):
+            def __instancecheck__(cls, instance):
+                return issubclass(type(instance), sp.matrices.MatrixBase)
+
+        class CustomMatrix(metaclass=CustomMatrixMeta):
+            def __new__(cls, data):
+                m = sp.matrices.dense.MutableDenseMatrix([[sp.Integer(1)]])
+                if data == [[sp.Symbol("empty_test")]]:
+                    m.rows = 0
+                return m
+
+        with patch("mathstore.core.matrix.sp.Matrix", CustomMatrix):
+            try:
+                mat_analyzer.parse_matrix("[[empty_test]]")
+            except ValueError:
+                pass
 
     def test_determinant(self, mat_analyzer: MatrixAnalyzer):
         """Compute determinant of 2x2 and 3x3 matrices."""

@@ -46,6 +46,11 @@ class TestCalculusAnalyzer:
         with pytest.raises(ValueError, match="Calculus error during differentiation"):
             analyzer.differentiate("sin(")
 
+    def test_calculus_blocks_injection(self, analyzer: CalculusAnalyzer):
+        """Verify that code injection attempts in expressions are blocked."""
+        with pytest.raises(ValueError):
+            analyzer.differentiate("__import__('os').system('echo')")
+
     def test_integrate_indefinite_polynomial(self, analyzer: CalculusAnalyzer):
         """Compute indefinite integral for polynomials."""
         assert analyzer.integrate("x**2") == "x**3/3"
@@ -155,7 +160,9 @@ class TestCalculusAnalyzer:
         lim_res = analyzer.get_limit("2^x sin x", limits=0)
         assert lim_res == "0"
 
-    def test_natural_text_implicit_multiplication_and_powers(self, analyzer: CalculusAnalyzer):
+    def test_natural_text_implicit_multiplication_and_powers(
+        self, analyzer: CalculusAnalyzer
+    ):
         """Verify normal text with implicit multiplication, caret powers, and e^x."""
         assert analyzer.differentiate("2x + 4") == "2"
         assert analyzer.differentiate("x^2") == "2*x"
@@ -175,4 +182,3 @@ class TestCalculusAnalyzer:
         assert expr == sp.sympify("2**x * sin(x)")
         expr2 = analyzer.parse_expression("e^(2x)")
         assert expr2 == sp.exp(2 * sp.Symbol("x"))
-

@@ -1,7 +1,22 @@
+import runpy
+import sys
+from unittest.mock import patch
+
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from mathstore.api.main import app
+from mathstore.api.main import app, run
+from mathstore.api.routes.statistics import (
+    binomial_dist_post,
+    normal_dist_post,
+    poisson_dist_post,
+)
+from mathstore.api.schemas import (
+    BinomialRequest,
+    NormalRequest,
+    PoissonRequest,
+)
 
 
 @pytest.fixture
@@ -54,7 +69,12 @@ class TestCalculusAPI:
     """Tests for /math calculus endpoints."""
 
     def test_diff_post(self, client: TestClient):
-        payload = {"expression": "x**3 + 2*x", "variable": "x", "order": 1, "steps": True}
+        payload = {
+            "expression": "x**3 + 2*x",
+            "variable": "x",
+            "order": 1,
+            "steps": True,
+        }
         res = client.post("/math/diff", json=payload)
         assert res.status_code == 200
         data = res.json()
@@ -204,6 +224,11 @@ class TestMatrixAPI:
         assert res.status_code == 400
         assert "Unsupported matrix operation" in res.json()["detail"]
 
+    def test_matrix_operation_error(self, client: TestClient):
+        res = client.post("/math/matrix/inv", json={"matrix": "1, 2; 2, 4"})
+        assert res.status_code == 400
+        assert "singular" in res.json()["detail"].lower()
+
 
 class TestStatisticsAPI:
     """Tests for /math/stats endpoints."""
@@ -219,7 +244,10 @@ class TestStatisticsAPI:
         payload = {"data": "10, 12, 14, 15, 18"}
         res = client.post("/math/stats/summary", json=payload)
         assert res.status_code == 200
-        assert "Mean: 13.8" in res.json()["summary"]
+        data = res.json()
+        assert "data" in data
+        assert "summary" in data
+        assert "Mean: 13.8" in data["summary"]
 
     def test_normal_distribution_post_and_get(self, client: TestClient):
         payload = {"x": 1.96, "mu": 0.0, "sigma": 1.0}
@@ -244,9 +272,14 @@ class TestStatisticsAPI:
         payload = {"k": 1, "lam": 2.0}
         res = client.post("/math/stats/poisson", json=payload)
         assert res.status_code == 200
+        data = res.json()
+        assert data["k"] == 1
+        assert data["lambda"] == 2.0
 
         res_get = client.get("/math/stats/poisson?k=1&lam=2.0")
         assert res_get.status_code == 200
+        assert res_get.json()["k"] == 1
+        assert res_get.json()["lambda"] == 2.0
 
     def test_confidence_interval_post(self, client: TestClient):
         payload = {"data": [22.0, 25.0, 27.0, 24.0, 26.0], "confidence": 0.95}
@@ -260,6 +293,41 @@ class TestStatisticsAPI:
         res = client.post("/math/stats/ttest", json=payload)
         assert res.status_code == 200
         assert "t_statistic" in res.json()["result"]
+
+    def test_stats_summary_error(self, client: TestClient):
+        res = client.post("/math/stats/summary", json={"data": "invalid_alpha_data"})
+        assert res.status_code == 400
+
+    def test_stats_distribution_error_handlers(self):
+        with pytest.raises(HTTPException) as exc_normal:
+            normal_dist_post(NormalRequest.model_construct(x=0.0, mu=0.0, sigma=-1.0))
+        assert exc_normal.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_binom:
+            binomial_dist_post(BinomialRequest.model_construct(k=-1, n=5, p=0.5))
+        assert exc_binom.value.status_code == 400
+
+        with pytest.raises(HTTPException) as exc_poisson:
+            poisson_dist_post(PoissonRequest.model_construct(k=2, lam=-1.0))
+        assert exc_poisson.value.status_code == 400
+
+    def test_stats_confidence_interval_non_str_and_error(self, client: TestClient):
+        res_latex = client.post(
+            "/math/stats/ci", json={"data": [10.0, 12.0, 14.0], "format": "latex"}
+        )
+        assert res_latex.status_code == 200
+        assert res_latex.json()["format"] == "latex"
+
+        res_err = client.post(
+            "/math/stats/ci", json={"data": "abc", "confidence": 0.95}
+        )
+        assert res_err.status_code == 400
+
+    def test_stats_ttest_error(self, client: TestClient):
+        res = client.post(
+            "/math/stats/ttest", json={"data": "not_numeric", "pop_mean": 10.0}
+        )
+        assert res.status_code == 400
 
 
 class TestStudyStepsAndPracticeAPI:
@@ -280,7 +348,9 @@ class TestStudyStepsAndPracticeAPI:
         assert res.status_code == 200
         assert len(res.json()["steps"]) >= 3
 
-        res_get = client.get("/math/steps/integrate?expression=x**2&lower_limit=0&upper_limit=2")
+        res_get = client.get(
+            "/math/steps/integrate?expression=x**2&lower_limit=0&upper_limit=2"
+        )
         assert res_get.status_code == 200
 
     def test_steps_solve(self, client: TestClient):
@@ -336,3 +406,36 @@ class TestStudyStepsAndPracticeAPI:
 
         res_404 = client.get("/math/ref/nonexistent_topic")
         assert res_404.status_code == 404
+
+    def test_study_steps_error_handling(self, client: TestClient):
+        res_diff = client.post("/math/steps/diff", json={"expression": "+++"})
+        assert res_diff.status_code == 400
+
+        res_int = client.post("/math/steps/integrate", json={"expression": "+++"})
+        assert res_int.status_code == 400
+
+        res_eq = client.post("/math/steps/solve", json={"equation": "+++"})
+        assert res_eq.status_code == 400
+
+
+@patch("uvicorn.run")
+def test_api_run_function(mock_uvicorn_run):
+    """Hits the run() function with custom arguments."""
+    run(host="127.0.0.1", port=9000, reload=True)
+
+    mock_uvicorn_run.assert_called_once_with(
+        "mathstore.api.main:app", host="127.0.0.1", port=9000, reload=True
+    )
+
+
+@patch("uvicorn.run")
+def test_api_main_execution_block(mock_uvicorn_run):
+    """Hits the 'if __name__ == "__main__":' block."""
+    # Temporarily remove mathstore.api.main from sys.modules to prevent RuntimeWarning
+    sys.modules.pop("mathstore.api.main", None)
+    runpy.run_module("mathstore.api.main", run_name="__main__")
+
+    # Verifies the default arguments were passed via the main block
+    mock_uvicorn_run.assert_called_once_with(
+        "mathstore.api.main:app", host="0.0.0.0", port=8000, reload=False
+    )

@@ -31,6 +31,14 @@ class TestStatsAnalyzer:
             stats.parse_data("a, b, c")
         with pytest.raises(ValueError, match="Unsupported data input type"):
             stats.parse_data(12345)
+        # Lines 30-31: Non-numeric elements in list/tuple
+        with pytest.raises(ValueError, match="All data points must be numeric"):
+            stats.parse_data([1, "non_numeric", 3])
+        # Line 44: String containing brackets or delimiters but no numbers
+        with pytest.raises(ValueError, match="Dataset contains no numeric values"):
+            stats.parse_data("[   ]")
+        with pytest.raises(ValueError, match="Dataset contains no numeric values"):
+            stats.parse_data("   , , ,   ")
 
     def test_mean(self, stats: StatsAnalyzer):
         """Compute arithmetic mean."""
@@ -120,6 +128,7 @@ class TestStatsAnalyzer:
         # Flip coin 4 times: P(2 heads) = 6/16 = 0.375
         assert math.isclose(stats.binomial_pmf(2, 4, 0.5), 0.375, rel_tol=1e-5)
         assert math.isclose(stats.binomial_cdf(4, 4, 0.5), 1.0, rel_tol=1e-5)
+        assert 0.0 < stats.binomial_cdf(2, 4, 0.5) < 1.0
         assert stats.binomial_pmf(5, 4, 0.5) == 0.0
         assert stats.binomial_cdf(-1, 4, 0.5) == 0.0
 
@@ -133,6 +142,7 @@ class TestStatsAnalyzer:
         # lambda = 2, P(X = 0) = e^(-2)
         expected_0 = math.exp(-2)
         assert math.isclose(stats.poisson_pmf(0, 2.0), expected_0, rel_tol=1e-5)
+        assert 0.0 < stats.poisson_cdf(2, 2.0) < 1.0
         assert stats.poisson_cdf(-1, 2.0) == 0.0
 
         with pytest.raises(ValueError, match="positive"):
@@ -154,10 +164,21 @@ class TestStatsAnalyzer:
         ci_pretty = stats.confidence_interval(data, confidence=0.95, format="pretty")
         assert "95% CI:" in ci_pretty
 
+        # High confidence hitting bisection expansion (lines 266-267)
+        ci_high = stats.confidence_interval([1.0, 2.0], confidence=0.99999)
+        assert ci_high[0] < ci_high[1]
+
         with pytest.raises(ValueError, match="between 0 and 1"):
             stats.confidence_interval(data, confidence=1.5)
         with pytest.raises(ValueError, match="at least 2"):
             stats.confidence_interval([5], confidence=0.95)
+
+    def test_t_critical_adaptive_small_df(self, stats: StatsAnalyzer):
+        """Verify numerical accuracy in t-critical for small df and high confidence."""
+        # df = 1, 99.9% confidence has true t* ~ 636.62
+        t_crit = stats._t_critical(0.999, df=1)
+        assert t_crit > 600.0
+        assert abs(t_crit - 636.62) < 1.0
 
     def test_one_sample_t_test(self, stats: StatsAnalyzer):
         """Perform one-sample Student's t-test."""
@@ -172,6 +193,14 @@ class TestStatsAnalyzer:
 
         res_lt = stats.one_sample_t_test(data, pop_mean=10.0, alternative="less")
         assert 0.0 <= res_lt["p_value"] <= 1.0
+
+        # Zero variance: sample mean matches hypothesized mean (lines 344-345)
+        res_zero_var = stats.one_sample_t_test([5.0, 5.0, 5.0], pop_mean=5.0)
+        assert res_zero_var["t_statistic"] == 0.0
+
+        # Zero variance: sample mean differs (lines 347-350)
+        with pytest.raises(ValueError, match="Sample variance is zero"):
+            stats.one_sample_t_test([5.0, 5.0, 5.0], pop_mean=10.0)
 
         # Formatting
         latex_out = stats.one_sample_t_test(data, pop_mean=10.0, format="latex")
