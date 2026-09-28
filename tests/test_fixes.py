@@ -30,6 +30,16 @@ class TestSecuritySafeParsing:
         expr = safe_sympify("cos(x) + sin(2*x) + 3*x**2")
         assert expr.has(sp.Symbol("x"))
 
+    def test_safe_sympify_equation_parsing(self):
+        eq = safe_sympify("2x + 6y = 0")
+        assert isinstance(eq, sp.Eq)
+        assert eq.lhs == safe_sympify("2x + 6y")
+        assert eq.rhs == sp.Integer(0)
+
+    def test_safe_sympify_multiple_equals_error(self):
+        with pytest.raises(ValueError, match="at most one '='"):
+            safe_sympify("x = y = 2")
+
     def test_calculus_blocks_injection(self):
         c = CalculusAnalyzer()
         with pytest.raises(ValueError):

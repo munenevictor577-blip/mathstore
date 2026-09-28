@@ -59,6 +59,15 @@ def safe_sympify(
     cleaned = raw.replace("·", "*").replace("×", "*")
     cleaned = re.sub(r"\|([^|]+)\|", r"Abs(\1)", cleaned)
 
+    # Handle natural language equations with '='
+    if "=" in cleaned:
+        parts = cleaned.split("=")
+        if len(parts) != 2:
+            raise ValueError(f"Equation must contain at most one '=' sign: '{raw}'")
+        lhs = safe_sympify(parts[0].strip(), locals_dict=locals_dict, variable=variable)
+        rhs = safe_sympify(parts[1].strip(), locals_dict=locals_dict, variable=variable)
+        return sp.Eq(lhs, rhs)
+
     # Clean optional trailing differential notation (e.g., '2^x sin x dx' -> '2^x sin x')
     if variable:
         cleaned = re.sub(r"\s*d" + re.escape(variable) + r"$", "", cleaned)

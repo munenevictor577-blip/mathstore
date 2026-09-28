@@ -24,17 +24,21 @@ def _compile_ode_patterns(func: str, var: str) -> tuple[re.Pattern, ...]:
     f_esc = re.escape(func)
     v_esc = re.escape(var)
 
-    # Leibniz notation: d2y/dx2, d^2y/dx^2, dy/dx, d^3y/dx^3
-    p_leibniz = re.compile(rf"\bd\^?(\d+)?{f_esc}/d\^?(\d+)?{v_esc}\^?(\d+)?\b")
+    arg_opt = rf"(?:\s*\(\s*{v_esc}\s*\))?"
 
-    # Prime notation: y'''', y''', y'', y'
-    p_primes_4plus = re.compile(rf"\b{f_esc}\'{{4,}}")
-    p_primes_3 = re.compile(rf"\b{f_esc}\'\'\'")
-    p_primes_2 = re.compile(rf"\b{f_esc}\'\'")
-    p_primes_1 = re.compile(rf"\b{f_esc}\'")
+    # Leibniz notation: d2y/dx2, d^2y/dx^2, dy/dx, d^3y/dx^3 with optional (var)
+    p_leibniz = re.compile(
+        rf"(?<![a-zA-Z_])d\^?(\d+)?{f_esc}/d\^?(\d+)?{v_esc}\^?(\d+)?{arg_opt}"
+    )
 
-    # Bare function token not followed by (
-    p_bare_func = re.compile(rf"\b{f_esc}\b(?!\s*\()")
+    # Prime notation: y'''', y''', y'', y' with optional (var) and preceding coefficients
+    p_primes_4plus = re.compile(rf"(?<![a-zA-Z_]){f_esc}\'{{4,}}{arg_opt}")
+    p_primes_3 = re.compile(rf"(?<![a-zA-Z_]){f_esc}\'\'\'{arg_opt}")
+    p_primes_2 = re.compile(rf"(?<![a-zA-Z_]){f_esc}\'\'{arg_opt}")
+    p_primes_1 = re.compile(rf"(?<![a-zA-Z_]){f_esc}\'{arg_opt}")
+
+    # Bare function token not followed by ( or letters
+    p_bare_func = re.compile(rf"(?<![a-zA-Z_]){f_esc}(?![a-zA-Z_]|\s*\()")
 
     # Initial condition pattern: y(0), y'(0), dy/dx(0)
     p_ics = re.compile(
@@ -100,8 +104,15 @@ class ODESolver:
 
         s = p_leibniz.sub(_replace_leibniz, s)
 
+        # Normalize implicit multiplication with variables, functions, and coefficients (e.g. 2xy -> 2*x*y, xy' -> x*y')
+        f_esc = re.escape(func)
+        v_esc = re.escape(var)
+        s = re.sub(rf"({v_esc})\s*({f_esc})", r"\1*\2", s)
+        s = re.sub(rf"(\d)\s*({f_esc}|{v_esc})", r"\1*\2", s)
+        s = re.sub(rf"(\))\s*({f_esc}|{v_esc})", r"\1*\2", s)
+
         # Normalize prime derivatives (highest order first)
-        s = p_p4.sub(lambda m: f"Derivative({func}({var}), {var}, {len(m.group(0)) - len(func)})", s)
+        s = p_p4.sub(lambda m: f"Derivative({func}({var}), {var}, {m.group(0).count(chr(39))})", s)
         s = p_p3.sub(f"Derivative({func}({var}), {var}, 3)", s)
         s = p_p2.sub(f"Derivative({func}({var}), {var}, 2)", s)
         s = p_p1.sub(f"Derivative({func}({var}), {var})", s)
@@ -399,7 +410,7 @@ class ODESolver:
             primary = f"Order {ord_val} Linear Constant-Coefficient Non-Homogeneous ODE (Undetermined Coefficients)"
         elif "nth_linear_constant_coeff_variation_of_parameters" in hint_set:
             primary = f"Order {ord_val} Linear Constant-Coefficient Non-Homogeneous ODE (Variation of Parameters)"
-        elif "homogeneous_coeff" in hint_set:
+        elif any("homogeneous_coeff" in h for h in hint_set):
             primary = "Homogeneous First-Order ODE"
         elif linear_val:
             primary = f"Order {ord_val} Linear Differential Equation"
@@ -492,12 +503,19 @@ class ODESolver:
             sol_eq = solution
         elif isinstance(solution, sp.Expr):
             sol_eq = sp.Eq(f_app, solution)
+        elif isinstance(solution, (int, float)):
+            sol_eq = sp.Eq(f_app, safe_sympify(solution, variable=var))
         elif isinstance(solution, str):
             clean_sol = solution.strip()
             if "=" in clean_sol:
                 parts = clean_sol.split("=", 1)
-                lhs = safe_sympify(parts[0].strip(), locals_dict={func: func_sym, var: var_sym}, variable=var)
-                rhs = safe_sympify(parts[1].strip(), locals_dict={func: func_sym, var: var_sym}, variable=var)
+                lhs_str = parts[0].strip()
+                rhs_str = parts[1].strip()
+                if lhs_str in (func, f"{func}({var})"):
+                    lhs = f_app
+                else:
+                    lhs = safe_sympify(lhs_str, locals_dict={func: func_sym, var: var_sym}, variable=var)
+                rhs = safe_sympify(rhs_str, locals_dict={func: func_sym, var: var_sym}, variable=var)
                 sol_eq = sp.Eq(lhs, rhs)
             else:
                 rhs = safe_sympify(clean_sol, locals_dict={func: func_sym, var: var_sym}, variable=var)

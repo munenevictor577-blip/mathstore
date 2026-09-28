@@ -420,3 +420,11 @@ class TestODEAPI:
         assert res.status_code == 400
         assert "contains no derivatives" in res.json()["detail"]
 
+        # Classify invalid equation
+        res_c = client.post("/math/ode/classify", json={"equation": "y' +* 2 = 0"})
+        assert res_c.status_code == 400
+
+        # Check invalid equation
+        res_chk = client.post("/math/ode/check", json={"equation": "y' +* 2 = 0", "solution": "1"})
+        assert res_chk.status_code == 400
+

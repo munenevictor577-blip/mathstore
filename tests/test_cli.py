@@ -485,6 +485,22 @@ class TestCLI:
         captured = capsys.readouterr().err
         assert "Error executing 'ode'" in captured
 
+    def test_cli_ode_formats(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+        """Test ode subcommand with --latex and --pretty formats."""
+        monkeypatch.setattr(
+            sys, "argv", ["mathstore", "ode", "y' + 2*y = 0", "--latex"]
+        )
+        main()
+        captured_latex = capsys.readouterr().out
+        assert "\\exp" in captured_latex or "e" in captured_latex
+
+        monkeypatch.setattr(
+            sys, "argv", ["mathstore", "ode", "y' + 2*y = 0", "--pretty"]
+        )
+        main()
+        captured_pretty = capsys.readouterr().out
+        assert "y(x)" in captured_pretty
+
 
 
 
