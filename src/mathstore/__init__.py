@@ -1,6 +1,7 @@
 from mathstore.algebra.solver import EquationSolver
 from mathstore.calculus.analyzer import CalculusAnalyzer
 from mathstore.core.matrix import MatrixAnalyzer
+from mathstore.ode.solver import ODESolver
 from mathstore.reference import get_reference, list_topics
 from mathstore.statistics.analyzer import StatsAnalyzer
 from mathstore.study import (
@@ -21,6 +22,7 @@ __all__ = [
     "CalculusAnalyzer",
     "EquationSolver",
     "MatrixAnalyzer",
+    "ODESolver",
     "PracticeQuestion",
     "PracticeSession",
     "StatsAnalyzer",
