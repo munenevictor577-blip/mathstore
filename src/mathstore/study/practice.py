@@ -60,6 +60,23 @@ class PracticeQuestion:
     tolerance: float = 1e-2
 
 
+def randint_nonzero(
+    rng: random.Random,
+    low: int,
+    high: int,
+    exclude: tuple[int, ...] | set[int] = (0,),
+) -> int:
+    """Generate a random integer in [low, high] excluding zero and any optional excluded values."""
+    val = rng.randint(low, high)
+    while val in exclude:
+        val = rng.randint(low, high)
+    return val
+
+
+_randint_nonzero = randint_nonzero
+randit_nonzero = randint_nonzero
+
+
 def _normalize_input_str(text: str) -> str:
     cleaned = text.strip()
     # Replace carets with double asterisks for exponents
@@ -229,7 +246,7 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
             prompt = f"Find the derivative f'(x) for f(x) = {expr}"
             hint = "Recall the power rule: d/dx[x^n] = n*x^(n-1) and sum rule."
         else:
-            a = rng.randint(2, 5)
+            a = _randint_nonzero(rng, -8, 8)
             fn = rng.choice([sp.sin, sp.cos])
             expr = a * fn(x)
             ans = sp.diff(expr, x)
@@ -248,13 +265,14 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
             prompt = f"Differentiate using the product rule: f(x) = {expr}"
             hint = "Recall the Product Rule: (u*v)' = u'*v + u*v'."
         elif choice == "chain_exp":
-            k = rng.choice([2, 3, 4])
-            expr = sp.exp(k * x)
+            k = randint_nonzero(rng, -5, 7)
+            a = randint_nonzero(rng, -3, 4)
+            expr = a * sp.exp(k * x)
             ans = sp.diff(expr, x)
             prompt = f"Find the derivative f'(x) for f(x) = {expr}"
             hint = "Recall the Chain Rule: d/dx[exp(k*x)] = k * exp(k*x)."
         else:
-            k = rng.choice([2, 3, 4])
+            k = randint_nonzero(rng, -5, 7)
             fn = rng.choice([sp.sin, sp.cos])
             expr = fn(k * x)
             ans = sp.diff(expr, x)
@@ -352,11 +370,16 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
                 is_definite=False,
             )
         if choice == "exp":
-            k = rng.choice([2, 3])
-            expr = sp.exp(k * x)
+            k = randint_nonzero(rng, -5, 5)
+            a = randint_nonzero(rng, -3, 4)
+            expr = a * sp.exp(k * x)
             ans = sp.integrate(expr, x)
-            prompt = f"Evaluate: ∫ {expr} dx"
-            hint = f"Recall: ∫ exp(k*x) dx = exp(k*x)/k + C with k = {k}."
+            prompt = f"Evaluate: ∫ ({expr}) dx"
+            hint = (
+                f"Recall: ∫ a*exp(k*x) dx = a*exp(k*x)/k + C."
+                if a != 1
+                else f"Recall: ∫ exp(k*x) dx = exp(k*x)/k + C with k = {k}."
+            )
             steps = get_integral_steps(str(expr), "x")
             return PracticeQuestion(
                 topic="integrals",
@@ -535,15 +558,16 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
     if difficulty == "easy":
         choice = rng.choice(["trace", "diag_det"])
         if choice == "trace":
-            a, b = rng.randint(1, 6), rng.randint(1, 6)
-            c, d = rng.randint(1, 6), rng.randint(1, 6)
+            a, b = rng.randint(-6, 6), rng.randint(-6, 6)
+            c, d = rng.randint(-6, 6), rng.randint(-6, 6)
             trace_val = a + d
             prompt = f"Calculate the trace of matrix A = [[{a}, {b}], [{c}, {d}]]"
             hint = "The trace is the sum of diagonal elements: trace(A) = a11 + a22."
+            d_str = f"({d})" if d < 0 else str(d)
             steps = [
                 f"Given matrix A = [[{a}, {b}], [{c}, {d}]]",
                 f"Identify diagonal entries: a11 = {a}, a22 = {d}",
-                f"Calculate trace: {a} + {d} = {trace_val}",
+                f"Calculate trace: {a} + {d_str} = {trace_val}",
             ]
             return PracticeQuestion(
                 topic="matrix",
@@ -555,14 +579,14 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
                 question_type="number",
                 correct_value=float(trace_val),
             )
-        a = rng.randint(2, 7)
-        d = rng.randint(2, 7)
+        a = _randint_nonzero(rng, -7, 7)
+        d = _randint_nonzero(rng, -7, 7)
         det_val = a * d
         prompt = f"Find the determinant of the diagonal matrix A = [[{a}, 0], [0, {d}]]"
         hint = "For a diagonal matrix, det is the product of diagonal elements: det = a11 * a22."
         steps = [
             f"Given diagonal matrix A = [[{a}, 0], [0, {d}]]",
-            f"Compute product of diagonal entries: {a} * {d} = {det_val}",
+            f"Compute product of diagonal entries: ({a}) * ({d}) = {det_val}",
         ]
         return PracticeQuestion(
             topic="matrix",
@@ -576,15 +600,16 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
         )
 
     if difficulty == "medium":
-        a, b = rng.randint(1, 5), rng.randint(1, 5)
-        c, d = rng.randint(1, 5), rng.randint(1, 5)
+        a, b = rng.randint(-5, 5), rng.randint(-5, 5)
+        c, d = rng.randint(-5, 5), rng.randint(-5, 5)
         det_val = a * d - b * c
         prompt = f"Find the determinant of matrix A = [[{a}, {b}], [{c}, {d}]]"
         hint = "Use formula det(A) = a*d - b*c."
+        bc_str = f"({b * c})" if b * c < 0 else str(b * c)
         steps = [
             f"Given 2x2 matrix A = [[{a}, {b}], [{c}, {d}]]",
             "Formula: det(A) = a*d - b*c",
-            f"Substitute values: ({a})*({d}) - ({b})*({c}) = {a * d} - {b * c} = {det_val}",
+            f"Substitute values: ({a})*({d}) - ({b})*({c}) = {a * d} - {bc_str} = {det_val}",
         ]
         return PracticeQuestion(
             topic="matrix",
@@ -600,16 +625,17 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
     # hard: 3x3 trace or upper triangular determinant
     choice = rng.choice(["3x3_trace", "triangular_det"])
     if choice == "3x3_trace":
-        d1, d2, d3 = rng.randint(1, 7), rng.randint(1, 7), rng.randint(1, 7)
+        d1, d2, d3 = rng.randint(-7, 7), rng.randint(-7, 7), rng.randint(-7, 7)
         trace_val = d1 + d2 + d3
         prompt = (
             f"Find the trace of matrix A = [[{d1}, 2, 3], [0, {d2}, 5], [1, 4, {d3}]]"
         )
         hint = "Sum the three main diagonal elements: a11 + a22 + a33."
+        diag_str = " + ".join(f"({d})" if d < 0 else str(d) for d in [d1, d2, d3])
         steps = [
             "Identify the main diagonal entries: a11, a22, a33",
             f"Entries: {d1}, {d2}, {d3}",
-            f"Trace = {d1} + {d2} + {d3} = {trace_val}",
+            f"Trace = {diag_str} = {trace_val}",
         ]
         return PracticeQuestion(
             topic="matrix",
@@ -621,14 +647,16 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
             question_type="number",
             correct_value=float(trace_val),
         )
-    d1, d2, d3 = rng.randint(2, 5), rng.randint(2, 5), rng.randint(2, 5)
+    d1 = _randint_nonzero(rng, -8, 8)
+    d2 = _randint_nonzero(rng, -8, 8)
+    d3 = _randint_nonzero(rng, -8, 8)
     det_val = d1 * d2 * d3
     prompt = f"Find the determinant of upper-triangular matrix A = [[{d1}, 3, 1], [0, {d2}, 4], [0, 0, {d3}]]"
     hint = "For any triangular matrix, determinant equals the product of its diagonal entries."
     steps = [
         "Matrix is upper triangular (all entries below diagonal are 0)",
         "Property: det(A) = product of diagonal entries",
-        f"Calculate: {d1} * {d2} * {d3} = {det_val}",
+        f"Calculate: ({d1}) * ({d2}) * ({d3}) = {det_val}",
     ]
     return PracticeQuestion(
         topic="matrix",
@@ -838,6 +866,7 @@ class PracticeSession:
         score = 0
         skipped = 0
         completed = 0
+        seen_prompts: set[str] = set()
 
         for i in range(1, self.count + 1):
             q = generate_question(
@@ -845,6 +874,16 @@ class PracticeSession:
                 difficulty=self.difficulty,
                 rng=self.rng,
             )
+            # Avoid repeating the same question during a session
+            retry_count = 0
+            while q.prompt in seen_prompts and retry_count < 30:
+                q = generate_question(
+                    topic=self.topic,
+                    difficulty=self.difficulty,
+                    rng=self.rng,
+                )
+                retry_count += 1
+            seen_prompts.add(q.prompt)
 
             self.print_func(
                 f"\n[Question {i}/{self.count}] ({q.topic.capitalize()} - {q.difficulty})"

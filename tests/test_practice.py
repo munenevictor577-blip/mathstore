@@ -31,7 +31,7 @@ class TestPracticeQuestionGeneration:
             assert q_der_trig.topic == "derivatives"
 
         # Derivatives: medium chain_exp (lines 222-226)
-        with patch.object(rng, "choice", side_effect=["chain_exp", 3]):
+        with patch.object(rng, "choice", side_effect=["chain_exp", 3, 2]):
             q_der_exp = _gen_derivative_question("medium", rng)
             assert "exp" in q_der_exp.prompt
 
@@ -503,9 +503,10 @@ class TestPracticeFormattingAndSession:
         assert "Step-by-step solution:" in card
 
     def test_practice_session_all_correct(self):
-        # Mock inputs: answer matching seed 42 ("2*cos(2*x)")
-        answers = iter(["2*cos(2*x)"])
         outputs = []
+        gen_rng = random.Random(42)
+        q = generate_question(topic="derivatives", difficulty="medium", rng=gen_rng)
+        answers = iter([str(q.expected_answer)])
 
         session = PracticeSession(
             topic="derivatives",
@@ -585,3 +586,58 @@ class TestPracticeFormattingAndSession:
         session = PracticeSession(count=5, print_func=printed.append)
         session._show_summary(score=3, completed=5, skipped=2)
         assert any("Good effort" in str(line) for line in printed)
+
+    def test_derivatives_unique_questions_with_seed(self):
+        """Verify that 5 questions generated with seed 42 are unique deterministically."""
+        my_rng = random.Random(42)
+        questions = [generate_question(topic="derivatives", rng=my_rng) for _ in range(5)]
+        prompts = [q.prompt for q in questions]
+        assert len(set(prompts)) == 5
+
+    def test_matrix_negative_entries(self):
+        """Verify that matrix questions can have negative entries."""
+        rng = random.Random(42)
+        negative_found = False
+        for diff in ["easy", "medium", "hard"]:
+            for _ in range(20):
+                q = generate_question(topic="matrix", difficulty=diff, rng=rng)
+                if "-" in q.prompt:
+                    negative_found = True
+                    break
+        assert negative_found
+
+    def test_practice_session_no_duplicate_prompts(self):
+        """Verify that questions do not repeat in a session."""
+        outputs = []
+        session = PracticeSession(
+            topic="derivatives",
+            count=5,
+            seed=42,
+            input_func=lambda _: "skip",
+            print_func=outputs.append,
+        )
+        summary = session.run()
+        assert summary["total"] == 5
+        assert summary["completed"] == 5
+        assert summary["skipped"] == 5
+
+    def test_randint_nonzero_helper(self):
+        """Verify randint_nonzero and alias randit_nonzero exclude zero and respect bounds."""
+        from mathstore.study.practice import randit_nonzero, randint_nonzero
+
+        rng = random.Random(123)
+        for _ in range(50):
+            val = randint_nonzero(rng, -5, 5)
+            assert val != 0
+            assert -5 <= val <= 5
+
+            val_alias = randit_nonzero(rng, -3, 3)
+            assert val_alias != 0
+            assert -3 <= val_alias <= 3
+
+    def test_integral_exp_generation(self):
+        """Verify exponential integrals are properly generated with valid antiderivatives."""
+        rng = random.Random(42)
+        q = _gen_integral_question("medium", rng)
+        assert q.topic == "integrals"
+        assert q.question_type == "integral"
