@@ -5,7 +5,7 @@ and solution verification for first- and higher-order ODEs.
 """
 
 from __future__ import annotations
-
+import concurrent.futures
 import functools
 import re
 from typing import Any
@@ -466,8 +466,17 @@ class ODESolver:
         if hint != "default":
             kwargs["hint"] = hint
 
+        # Isolate the CAS execution to prevent infinite hangs
         try:
-            sol = sp.dsolve(eq, f_app, **kwargs)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(sp.dsolve, eq, f_app, **kwargs)
+                # Enforce a strict 5.0 second timeout
+                sol = future.result(timeout=5.0)
+        except concurrent.futures.TimeoutError as e:
+            raise ValueError(
+                f"Evaluation timed out. The differential equation '{equation}' is "
+                "too complex or computationally intensive to solve analytically."
+            ) from e
         except Exception as e:
             raise ValueError(
                 f"Unable to find an analytical solution for ODE '{equation}': {e}"
@@ -507,6 +516,13 @@ class ODESolver:
             sol_eq = sp.Eq(f_app, safe_sympify(solution, variable=var))
         elif isinstance(solution, str):
             clean_sol = solution.strip()
+            
+            # Inject standard integration constants to prevent parsing failures
+            locs = {func: func_sym, var: var_sym, "C": sp.Symbol("C"), "c": sp.Symbol("c")}
+            for i in range(1, 10):
+                locs[f"C{i}"] = sp.Symbol(f"C{i}")
+                locs[f"c{i}"] = sp.Symbol(f"c{i}")
+
             if "=" in clean_sol:
                 parts = clean_sol.split("=", 1)
                 lhs_str = parts[0].strip()
@@ -514,11 +530,11 @@ class ODESolver:
                 if lhs_str in (func, f"{func}({var})"):
                     lhs = f_app
                 else:
-                    lhs = safe_sympify(lhs_str, locals_dict={func: func_sym, var: var_sym}, variable=var)
-                rhs = safe_sympify(rhs_str, locals_dict={func: func_sym, var: var_sym}, variable=var)
+                    lhs = safe_sympify(lhs_str, locals_dict=locs, variable=var)
+                rhs = safe_sympify(rhs_str, locals_dict=locs, variable=var)
                 sol_eq = sp.Eq(lhs, rhs)
             else:
-                rhs = safe_sympify(clean_sol, locals_dict={func: func_sym, var: var_sym}, variable=var)
+                rhs = safe_sympify(clean_sol, locals_dict=locs, variable=var)
                 sol_eq = sp.Eq(f_app, rhs)
         else:
             raise ValueError(f"Unsupported solution type: {type(solution).__name__}")
