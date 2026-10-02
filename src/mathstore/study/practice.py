@@ -58,6 +58,20 @@ class PracticeQuestion:
     variable: str = "x"
     is_definite: bool = False
     tolerance: float = 1e-2
+    subtype: str = ""
+
+
+def _select_subtype(
+    rng: random.Random,
+    subtypes: list[str],
+    exclude_subtypes: set[str] | list[str] | None = None,
+) -> str:
+    """Select a question subtype, preferring ones not yet used in the session."""
+    if exclude_subtypes:
+        candidates = [s for s in subtypes if s not in exclude_subtypes]
+        if candidates:
+            return rng.choice(candidates)
+    return rng.choice(subtypes)
 
 
 def randint_nonzero(
@@ -74,8 +88,6 @@ def randint_nonzero(
 
 
 _randint_nonzero = randint_nonzero
-randit_nonzero = randint_nonzero
-
 
 def _normalize_input_str(text: str) -> str:
     cleaned = text.strip()
@@ -233,10 +245,15 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
     return False, "Unsupported question type."
 
 
-def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQuestion:
+def _gen_derivative_question(
+    difficulty: str,
+    rng: random.Random,
+    exclude_subtypes: set[str] | list[str] | None = None,
+) -> PracticeQuestion:
     x = sp.Symbol("x")
     if difficulty == "easy":
-        choice = rng.choice(["poly", "trig"])
+        subtypes = ["poly", "trig", "exp", "log"]
+        choice = _select_subtype(rng, subtypes, exclude_subtypes)
         if choice == "poly":
             a = rng.randint(2, 6)
             n = rng.randint(2, 4)
@@ -245,8 +262,20 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
             ans = sp.diff(expr, x)
             prompt = f"Find the derivative f'(x) for f(x) = {expr}"
             hint = "Recall the power rule: d/dx[x^n] = n*x^(n-1) and sum rule."
+        elif choice == "exp":
+            a = randint_nonzero(rng, -5, 5)
+            expr = a * sp.exp(x)
+            ans = sp.diff(expr, x)
+            prompt = f"Find the derivative f'(x) for f(x) = {expr}"
+            hint = "Recall the exponential rule: d/dx[exp(x)] = exp(x)."
+        elif choice == "log":
+            a = randint_nonzero(rng, -5, 5)
+            expr = a * sp.log(x)
+            ans = sp.diff(expr, x)
+            prompt = f"Find the derivative f'(x) for f(x) = {expr}"
+            hint = "Recall the logarithmic rule: d/dx[ln(x)] = 1/x."
         else:
-            a = _randint_nonzero(rng, -8, 8)
+            a = randint_nonzero(rng, -8, 8)
             fn = rng.choice([sp.sin, sp.cos])
             expr = a * fn(x)
             ans = sp.diff(expr, x)
@@ -256,7 +285,15 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
             )
 
     elif difficulty == "medium":
-        choice = rng.choice(["product", "chain_exp", "chain_trig"])
+        subtypes = [
+            "product",
+            "chain_exp",
+            "chain_trig",
+            "quotient",
+            "chain_power",
+            "chain_log",
+        ]
+        choice = _select_subtype(rng, subtypes, exclude_subtypes)
         if choice == "product":
             n = rng.choice([1, 2])
             fn = rng.choice([sp.sin, sp.exp])
@@ -271,16 +308,38 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
             ans = sp.diff(expr, x)
             prompt = f"Find the derivative f'(x) for f(x) = {expr}"
             hint = "Recall the Chain Rule: d/dx[exp(k*x)] = k * exp(k*x)."
-        else:
+        elif choice == "chain_trig":
             k = randint_nonzero(rng, -5, 7)
             fn = rng.choice([sp.sin, sp.cos])
             expr = fn(k * x)
             ans = sp.diff(expr, x)
             prompt = f"Find the derivative f'(x) for f(x) = {expr}"
             hint = f"Recall the Chain Rule: d/dx[{fn.__name__}(k*x)] = {fn.__name__}'(k*x) * k."
+        elif choice == "quotient":
+            c = randint_nonzero(rng, 1, 5)
+            expr = x / (x + c)
+            ans = sp.diff(expr, x)
+            prompt = f"Differentiate using the quotient rule: f(x) = {expr}"
+            hint = "Recall the Quotient Rule: (u/v)' = (u'*v - u*v') / v^2."
+        elif choice == "chain_power":
+            a = randint_nonzero(rng, 2, 4)
+            b = randint_nonzero(rng, -3, 4)
+            n = rng.choice([3, 4])
+            expr = (a * x + b) ** n
+            ans = sp.diff(expr, x)
+            prompt = f"Find the derivative f'(x) for f(x) = {expr}"
+            hint = "Recall the Generalized Power Rule: d/dx[u^n] = n*u^(n-1) * u'."
+        else:  # chain_log
+            a = randint_nonzero(rng, 2, 4)
+            b = randint_nonzero(rng, 1, 5)
+            expr = sp.log(a * x + b)
+            ans = sp.diff(expr, x)
+            prompt = f"Differentiate the composite function: f(x) = {expr}"
+            hint = "Recall the Logarithmic Chain Rule: d/dx[ln(u)] = (1/u) * u'."
 
     else:  # hard
-        choice = rng.choice(["composite_log", "prod_trig_exp", "quotient"])
+        subtypes = ["composite_log", "prod_trig_exp", "quotient", "composite_exp_trig"]
+        choice = _select_subtype(rng, subtypes, exclude_subtypes)
         if choice == "composite_log":
             k = rng.randint(2, 4)
             expr = sp.log(k * x**2 + 1)
@@ -293,6 +352,11 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
             ans = sp.diff(expr, x)
             prompt = f"Differentiate using product and chain rules: f(x) = {expr}"
             hint = "Apply the Product Rule (u*v)' = u'*v + u*v' with u=exp(k*x) and v=sin(x)."
+        elif choice == "composite_exp_trig":
+            expr = sp.exp(sp.sin(x))
+            ans = sp.diff(expr, x)
+            prompt = f"Differentiate the composite function: f(x) = {expr}"
+            hint = "Apply the Chain Rule: d/dx[exp(u)] = exp(u) * u'."
         else:
             c = rng.randint(1, 4)
             expr = x / (x + c)
@@ -311,13 +375,19 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
         question_type="derivative",
         correct_value=ans,
         variable="x",
+        subtype=choice,
     )
 
 
-def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuestion:
+def _gen_integral_question(
+    difficulty: str,
+    rng: random.Random,
+    exclude_subtypes: set[str] | list[str] | None = None,
+) -> PracticeQuestion:
     x = sp.Symbol("x")
     if difficulty == "easy":
-        choice = rng.choice(["poly", "trig"])
+        subtypes = ["poly", "trig"]
+        choice = _select_subtype(rng, subtypes, exclude_subtypes)
         if choice == "poly":
             a = rng.randint(2, 5)
             n = rng.randint(1, 3)
@@ -345,10 +415,12 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
             correct_value=ans,
             variable="x",
             is_definite=False,
+            subtype=choice,
         )
 
     if difficulty == "medium":
-        choice = rng.choice(["u_sub", "exp", "reciprocal", "definite"])
+        subtypes = ["u_sub", "exp", "reciprocal", "definite"]
+        choice = _select_subtype(rng, subtypes, exclude_subtypes)
         if choice == "u_sub":
             k = rng.choice([2, 3, 4])
             fn = rng.choice([sp.sin, sp.cos])
@@ -368,6 +440,7 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
                 correct_value=ans,
                 variable="x",
                 is_definite=False,
+                subtype=choice,
             )
         if choice == "exp":
             k = randint_nonzero(rng, -5, 5)
@@ -392,6 +465,7 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
                 correct_value=ans,
                 variable="x",
                 is_definite=False,
+                subtype=choice,
             )
         if choice == "reciprocal":
             a = rng.randint(2, 5)
@@ -411,6 +485,7 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
                 correct_value=ans,
                 variable="x",
                 is_definite=False,
+                subtype=choice,
             )
         # definite
         upper = rng.randint(1, 3)
@@ -430,10 +505,12 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
             correct_value=ans,
             variable="x",
             is_definite=True,
+            subtype=choice,
         )
 
     # hard
-    choice = rng.choice(["parts_exp", "parts_trig", "arctan_form"])
+    subtypes = ["parts_exp", "parts_trig", "arctan_form"]
+    choice = _select_subtype(rng, subtypes, exclude_subtypes)
     if choice == "parts_exp":
         expr = x * sp.exp(x)
         ans = sp.integrate(expr, x)
@@ -462,6 +539,7 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
         correct_value=ans,
         variable="x",
         is_definite=False,
+        subtype=choice,
     )
 
 
@@ -790,6 +868,7 @@ def generate_question(
     difficulty: str = "medium",
     seed: int | None = None,
     rng: random.Random | None = None,
+    exclude_subtypes: set[str] | list[str] | None = None,
 ) -> PracticeQuestion:
     """Generates a randomized practice problem according to requested topic and difficulty."""
     if rng is None:
@@ -804,9 +883,13 @@ def generate_question(
         chosen_diff = rng.choice(["easy", "medium", "hard"])
 
     if canonical_topic == "derivatives":
-        return _gen_derivative_question(chosen_diff, rng)
+        return _gen_derivative_question(
+            chosen_diff, rng, exclude_subtypes=exclude_subtypes
+        )
     if canonical_topic == "integrals":
-        return _gen_integral_question(chosen_diff, rng)
+        return _gen_integral_question(
+            chosen_diff, rng, exclude_subtypes=exclude_subtypes
+        )
     if canonical_topic == "algebra":
         return _gen_algebra_question(chosen_diff, rng)
     if canonical_topic == "matrix":
@@ -814,7 +897,7 @@ def generate_question(
     if canonical_topic == "stats":
         return _gen_stats_question(chosen_diff, rng)
 
-    return _gen_derivative_question(chosen_diff, rng)
+    return _gen_derivative_question(chosen_diff, rng, exclude_subtypes=exclude_subtypes)
 
 
 def format_question_card(q: PracticeQuestion, index: int | None = None) -> str:
@@ -867,12 +950,14 @@ class PracticeSession:
         skipped = 0
         completed = 0
         seen_prompts: set[str] = set()
+        used_subtypes: set[str] = set()
 
         for i in range(1, self.count + 1):
             q = generate_question(
                 topic=self.topic,
                 difficulty=self.difficulty,
                 rng=self.rng,
+                exclude_subtypes=used_subtypes,
             )
             # Avoid repeating the same question during a session
             retry_count = 0
@@ -881,9 +966,12 @@ class PracticeSession:
                     topic=self.topic,
                     difficulty=self.difficulty,
                     rng=self.rng,
+                    exclude_subtypes=used_subtypes,
                 )
                 retry_count += 1
             seen_prompts.add(q.prompt)
+            if q.subtype:
+                used_subtypes.add(q.subtype)
 
             self.print_func(
                 f"\n[Question {i}/{self.count}] ({q.topic.capitalize()} - {q.difficulty})"

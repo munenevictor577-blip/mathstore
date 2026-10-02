@@ -430,17 +430,26 @@ def main():
 
                 rng = random.Random(args.seed) if args.seed is not None else None
                 seen_prompts: set[str] = set()
+                used_subtypes: set[str] = set()
                 for i in range(1, count + 1):
                     q = generate_question(
-                        topic=topic, difficulty=args.difficulty, rng=rng
+                        topic=topic,
+                        difficulty=args.difficulty,
+                        rng=rng,
+                        exclude_subtypes=used_subtypes,
                     )
                     retry_count = 0
                     while q.prompt in seen_prompts and retry_count < 30:
                         q = generate_question(
-                            topic=topic, difficulty=args.difficulty, rng=rng
+                            topic=topic,
+                            difficulty=args.difficulty,
+                            rng=rng,
+                            exclude_subtypes=used_subtypes,
                         )
                         retry_count += 1
                     seen_prompts.add(q.prompt)
+                    if q.subtype:
+                        used_subtypes.add(q.subtype)
                     card = format_question_card(q, index=i if count > 1 else None)
                     print(card)
                     if i < count:

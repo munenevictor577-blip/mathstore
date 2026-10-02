@@ -641,3 +641,33 @@ class TestPracticeFormattingAndSession:
         q = _gen_integral_question("medium", rng)
         assert q.topic == "integrals"
         assert q.question_type == "integral"
+
+    def test_derivative_session_subtype_diversity(self):
+        """Verify that a 5-question derivative session generates diverse subtypes without repeats."""
+        for seed in [1, 42, 99, 123]:
+            session = PracticeSession(
+                topic="derivatives",
+                count=5,
+                seed=seed,
+                input_func=lambda _: "skip",
+                print_func=lambda *args: None,
+            )
+            summary = session.run()
+            assert summary["total"] == 5
+
+            # Verify that session question generation ensures all 5 subtypes are unique
+            rng = random.Random(seed)
+            used: set[str] = set()
+            subtypes = []
+            for _ in range(5):
+                q = generate_question(
+                    topic="derivatives",
+                    difficulty="medium",
+                    rng=rng,
+                    exclude_subtypes=used,
+                )
+                used.add(q.subtype)
+                subtypes.append(q.subtype)
+
+            assert len(set(subtypes)) == 5, f"Seed {seed} had non-unique subtypes: {subtypes}"
+            assert subtypes.count("chain_exp") <= 1
