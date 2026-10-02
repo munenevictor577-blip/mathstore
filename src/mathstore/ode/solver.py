@@ -45,13 +45,21 @@ def _compile_ode_patterns(func: str, var: str) -> tuple[re.Pattern, ...]:
         rf"^(?:{f_esc}(\'*)|d\^?(\d+)?{f_esc}/d\^?(\d+)?{v_esc}\^?(\d+)?)\s*\((.*?)\)$"
     )
 
-    return (p_leibniz, p_primes_4plus, p_primes_3, p_primes_2, p_primes_1, p_bare_func, p_ics)
+    return (
+        p_leibniz,
+        p_primes_4plus,
+        p_primes_3,
+        p_primes_2,
+        p_primes_1,
+        p_bare_func,
+        p_ics,
+    )
 
 
 class ODESolver:
     """
     High-performance analytical ODE solver and classifier for STEM education.
-    
+
     Supports:
       - 1st-order ODEs: separable, linear integrating factors, exact, Bernoulli, homogeneous.
       - Higher-order linear ODEs: constant coefficients, undetermined coefficients, variation of parameters.
@@ -112,7 +120,10 @@ class ODESolver:
         s = re.sub(rf"(\))\s*({f_esc}|{v_esc})", r"\1*\2", s)
 
         # Normalize prime derivatives (highest order first)
-        s = p_p4.sub(lambda m: f"Derivative({func}({var}), {var}, {m.group(0).count(chr(39))})", s)
+        s = p_p4.sub(
+            lambda m: f"Derivative({func}({var}), {var}, {m.group(0).count(chr(39))})",
+            s,
+        )
         s = p_p3.sub(f"Derivative({func}({var}), {var}, 3)", s)
         s = p_p2.sub(f"Derivative({func}({var}), {var}, 2)", s)
         s = p_p1.sub(f"Derivative({func}({var}), {var})", s)
@@ -154,7 +165,9 @@ class ODESolver:
             norm_str = self.normalize_ode_string(equation, var=var, func=func)
             parts = norm_str.split("=")
             if len(parts) != 2:
-                raise ValueError("ODE must contain at most one '=' separating LHS and RHS.")
+                raise ValueError(
+                    "ODE must contain at most one '=' separating LHS and RHS."
+                )
 
             var_sym = self._get_symbol(var)
             func_sym = self._get_function(func)
@@ -170,7 +183,9 @@ class ODESolver:
                 rhs = safe_sympify(parts[1].strip(), locals_dict=locs, variable=var)
                 eq = sp.Eq(lhs, rhs)
             except Exception as e:
-                raise ValueError(f"Failed to parse differential equation '{equation}': {e}") from e
+                raise ValueError(
+                    f"Failed to parse differential equation '{equation}': {e}"
+                ) from e
         else:
             raise TypeError(f"Unsupported equation type: {type(equation).__name__}")
 
@@ -214,7 +229,11 @@ class ODESolver:
         if isinstance(ics_input, dict):
             for k, v in ics_input.items():
                 if isinstance(k, sp.Basic):
-                    v_sym = safe_sympify(v, variable=var) if not isinstance(v, sp.Basic) else v
+                    v_sym = (
+                        safe_sympify(v, variable=var)
+                        if not isinstance(v, sp.Basic)
+                        else v
+                    )
                     res[k] = v_sym
                 elif isinstance(k, (int, float)):
                     x0 = safe_sympify(k, variable=var)
@@ -228,22 +247,32 @@ class ODESolver:
                             if order_idx == 0:
                                 res[func_sym(x0)] = val_sym
                             else:
-                                deriv = sp.Derivative(func_sym(var_sym), (var_sym, order_idx))
+                                deriv = sp.Derivative(
+                                    func_sym(var_sym), (var_sym, order_idx)
+                                )
                                 res[deriv.subs(var_sym, x0)] = val_sym
                     else:
-                        val_sym = safe_sympify(v, variable=var) if not isinstance(v, sp.Basic) else v
+                        val_sym = (
+                            safe_sympify(v, variable=var)
+                            if not isinstance(v, sp.Basic)
+                            else v
+                        )
                         res[func_sym(x0)] = val_sym
                 elif isinstance(k, str):
                     eq_str = f"{k} = {v}"
                     res.update(self._parse_ics_string(eq_str, var=var, func=func))
                 else:
-                    raise TypeError(f"Invalid initial condition key type: {type(k).__name__}")
+                    raise TypeError(
+                        f"Invalid initial condition key type: {type(k).__name__}"
+                    )
             return res
 
         if isinstance(ics_input, str):
             return self._parse_ics_string(ics_input, var=var, func=func)
 
-        raise TypeError(f"Unsupported initial conditions type: {type(ics_input).__name__}")
+        raise TypeError(
+            f"Unsupported initial conditions type: {type(ics_input).__name__}"
+        )
 
     def _parse_ics_string(
         self,
@@ -456,7 +485,9 @@ class ODESolver:
         func_sym = self._get_function(func)
         f_app = func_sym(var_sym)
 
-        parsed_ics = self.parse_ics(ics, var=var, func=func) if ics is not None else None
+        parsed_ics = (
+            self.parse_ics(ics, var=var, func=func) if ics is not None else None
+        )
 
         kwargs: dict[str, Any] = {
             "simplify": simplify,
@@ -516,9 +547,14 @@ class ODESolver:
             sol_eq = sp.Eq(f_app, safe_sympify(solution, variable=var))
         elif isinstance(solution, str):
             clean_sol = solution.strip()
-            
+
             # Inject standard integration constants to prevent parsing failures
-            locs = {func: func_sym, var: var_sym, "C": sp.Symbol("C"), "c": sp.Symbol("c")}
+            locs = {
+                func: func_sym,
+                var: var_sym,
+                "C": sp.Symbol("C"),
+                "c": sp.Symbol("c"),
+            }
             for i in range(1, 10):
                 locs[f"C{i}"] = sp.Symbol(f"C{i}")
                 locs[f"c{i}"] = sp.Symbol(f"c{i}")
@@ -578,3 +614,177 @@ class ODESolver:
             return str(solution.rhs)
 
         return f"{solution.lhs} = {solution.rhs}"
+
+    def get_steps(
+        self,
+        equation: str | sp.Eq | sp.Expr,
+        var: str = "x",
+        func: str = "y",
+    ) -> list[str]:
+        """
+        Generates step-by-step pedagogical explanations for solving an ODE.
+        Supports Separable and First-Order Linear (Integrating Factor) equations.
+        """
+        eq = self.parse_equation(equation, var=var, func=func)
+        var_sym = self._get_symbol(var)
+        func_sym = self._get_function(func)
+        f_app = func_sym(var_sym)
+        deriv = sp.Derivative(f_app, var_sym)
+        y_sym = sp.Symbol(func)
+
+        # Classify to determine the solution path
+        try:
+            hints = classify_ode(eq, f_app)
+        except Exception:
+            hints = ()
+
+        steps = [f"Given the differential equation: {eq.lhs} = {eq.rhs}"]
+
+        # 1. Separable First-Order ODE
+        if "separable" in hints:
+            steps.append("1. Classify the equation: Separable First-Order ODE.")
+            try:
+                isolated = sp.solve(eq, deriv)
+                if isolated:
+                    rhs = isolated[0]
+                    rhs_sub = rhs.subs(f_app, y_sym)
+                    separated = sp.separatevars(
+                        rhs_sub, dict=True, symbols=[var_sym, y_sym]
+                    )
+
+                    if separated is not None:
+                        M_x = (
+                            separated.get(var_sym, 1) * separated.get("coeff", 1)
+                        ).simplify()
+                        N_y = (1 / separated.get(y_sym, 1)).simplify()
+
+                        steps.append(
+                            f"2. Rearrange the equation to isolate all '{func}' terms on one side and '{var}' terms on the other:"
+                        )
+                        steps.append(f"   ({N_y}) d{func} = ({M_x}) d{var}")
+                        steps.append(
+                            f"3. Integrate both sides with respect to their variables:"
+                        )
+                        steps.append(f"   ∫ ({N_y}) d{func} = ∫ ({M_x}) d{var} + C")
+
+                        int_N = sp.integrate(N_y, y_sym)
+                        int_M = sp.integrate(M_x, var_sym)
+                        steps.append(
+                            f"4. Evaluate the integrals to find the implicit solution:"
+                        )
+                        steps.append(f"   {int_N} = {int_M} + C")
+
+                        try:
+                            sol = self.solve(eq, var=var, func=func)
+                            sol_str = (
+                                ", ".join(str(s) for s in sol)
+                                if isinstance(sol, list)
+                                else str(sol)
+                            )
+                            steps.append(
+                                f"5. Solve algebraically for explicit {func}({var}):"
+                            )
+                            steps.append(f"   {sol_str}")
+                        except Exception:
+                            steps.append(
+                                f"5. Solve algebraically for the explicit function {func}({var}) if possible."
+                            )
+                        return steps
+            except Exception:
+                pass
+
+            # Generic fallback if symbolic separation extraction fails
+            steps.append(
+                f"2. Rearrange the equation to isolate all '{func}' terms on one side and '{var}' terms on the other: N({func}) d{func} = M({var}) d{var}."
+            )
+            steps.append(
+                "3. Integrate both sides with respect to their respective variables, adding a constant of integration C."
+            )
+            steps.append("4. Evaluate the integrals to find the implicit solution.")
+            steps.append(
+                f"5. Solve algebraically for the explicit function {func}({var}) if possible."
+            )
+            return steps
+
+        # 2. First-Order Linear ODE (Integrating Factor)
+        if "1st_linear" in hints:
+            steps.append("1. Classify the equation: First-Order Linear ODE.")
+            try:
+                # Attempt to isolate y' to get standard form: y' + P(x)y = Q(x)
+                isolated = sp.solve(eq, deriv)
+                if isolated:
+                    rhs = isolated[0]
+                    # Extract P(x) and Q(x)
+                    P_x = -sp.diff(rhs, f_app).simplify()
+                    Q_x = (rhs + P_x * f_app).simplify()
+
+                    steps.append(
+                        f"2. Rewrite in standard form {func}' + P({var}){func} = Q({var}):"
+                    )
+                    steps.append(f"   {func}' + ({P_x})*{func} = {Q_x}")
+
+                    int_P = sp.integrate(P_x, var_sym)
+                    IF = sp.simplify(sp.exp(int_P))
+
+                    steps.append(
+                        f"3. Identify P({var}) = {P_x} and compute the Integrating Factor (IF):"
+                    )
+                    steps.append(
+                        f"   IF = exp( ∫ P({var}) d{var} ) = exp({int_P}) = {IF}"
+                    )
+                    steps.append(
+                        f"4. Multiply both sides of the standard equation by the Integrating Factor {IF}."
+                    )
+                    steps.append(
+                        f"5. The left side collapses via the reverse Product Rule into: d/d{var}[ {func} * ({IF}) ]"
+                    )
+                    int_IF_Q = sp.integrate((IF * Q_x).simplify(), var_sym)
+                    steps.append(f"6. Integrate both sides with respect to {var}:")
+                    steps.append(f"   {func} * ({IF}) = ∫ ({IF * Q_x}) d{var} + C")
+                    steps.append(f"   {func} * ({IF}) = {int_IF_Q} + C")
+                    try:
+                        sol = self.solve(eq, var=var, func=func)
+                        sol_str = (
+                            ", ".join(str(s) for s in sol)
+                            if isinstance(sol, list)
+                            else str(sol)
+                        )
+                        steps.append(
+                            f"7. Solve for {func}({var}) by dividing by the Integrating Factor:"
+                        )
+                        steps.append(f"   {sol_str}")
+                    except Exception:
+                        steps.append(
+                            f"7. Solve for {func} by dividing by the Integrating Factor."
+                        )
+                    return steps
+            except Exception:
+                pass
+
+            # Fallback for complex linear ODEs where extraction fails
+            steps.append(
+                f"2. Ensure the equation is in the standard form: {func}' + P({var}){func} = Q({var})."
+            )
+            steps.append(
+                f"3. Compute the Integrating Factor: IF = exp( ∫ P({var}) d{var} )."
+            )
+            steps.append(
+                f"4. Multiply both sides by the IF, allowing the left side to collapse to d/d{var}[IF * {func}]."
+            )
+            steps.append(
+                f"5. Integrate both sides with respect to {var} and solve for {func}."
+            )
+            return steps
+
+        # Generic fallback for unsupported types
+        classification = self.classify(eq, var=var, func=func)
+        primary_type = classification.get("primary_type", "Differential Equation")
+        steps.append(f"1. Classify the equation: {primary_type}.")
+        steps.append(
+            "2. Apply the corresponding analytical method to solve the equation."
+        )
+        steps.append(
+            "3. Simplify the resulting expression and apply initial conditions if provided."
+        )
+
+        return steps

@@ -54,7 +54,12 @@ class TestCalculusAPI:
     """Tests for /math calculus endpoints."""
 
     def test_diff_post(self, client: TestClient):
-        payload = {"expression": "x**3 + 2*x", "variable": "x", "order": 1, "steps": True}
+        payload = {
+            "expression": "x**3 + 2*x",
+            "variable": "x",
+            "order": 1,
+            "steps": True,
+        }
         res = client.post("/math/diff", json=payload)
         assert res.status_code == 200
         data = res.json()
@@ -280,7 +285,9 @@ class TestStudyStepsAndPracticeAPI:
         assert res.status_code == 200
         assert len(res.json()["steps"]) >= 3
 
-        res_get = client.get("/math/steps/integrate?expression=x**2&lower_limit=0&upper_limit=2")
+        res_get = client.get(
+            "/math/steps/integrate?expression=x**2&lower_limit=0&upper_limit=2"
+        )
         assert res_get.status_code == 200
 
     def test_steps_solve(self, client: TestClient):
@@ -425,6 +432,59 @@ class TestODEAPI:
         assert res_c.status_code == 400
 
         # Check invalid equation
-        res_chk = client.post("/math/ode/check", json={"equation": "y' +* 2 = 0", "solution": "1"})
+        res_chk = client.post(
+            "/math/ode/check", json={"equation": "y' +* 2 = 0", "solution": "1"}
+        )
         assert res_chk.status_code == 400
+
+    def test_ode_solve_with_steps(self, client: TestClient):
+        # POST with steps=True
+        res = client.post(
+            "/math/ode/solve", json={"equation": "y' = x*y", "steps": True}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["steps"] is not None
+        assert any("Separable" in s for s in data["steps"])
+
+        # GET with steps=true
+        res_get = client.get(
+            "/math/ode/solve",
+            params={"equation": "y' + 2*y = exp(x)", "steps": "true"},
+        )
+        assert res_get.status_code == 200
+        data_get = res_get.json()
+        assert data_get["steps"] is not None
+        assert any("Integrating Factor" in s for s in data_get["steps"])
+
+    def test_ode_steps_endpoints(self, client: TestClient):
+        # POST /math/ode/steps
+        res = client.post("/math/ode/steps", json={"equation": "y' = y^2"})
+        assert res.status_code == 200
+        data = res.json()
+        assert "steps" in data
+        assert any("Separable" in s for s in data["steps"])
+
+        # GET /math/ode/steps
+        res_get = client.get(
+            "/math/ode/steps", params={"equation": "y' + 2*y = exp(x)"}
+        )
+        assert res_get.status_code == 200
+        data_get = res_get.json()
+        assert any("Linear" in s for s in data_get["steps"])
+
+    def test_study_steps_ode_endpoints(self, client: TestClient):
+        # POST /math/steps/ode
+        res = client.post("/math/steps/ode", json={"equation": "y' = x*y"})
+        assert res.status_code == 200
+        data = res.json()
+        assert any("Separable" in s for s in data["steps"])
+
+        # GET /math/steps/ode
+        res_get = client.get(
+            "/math/steps/ode", params={"equation": "y' = exp(x)/y"}
+        )
+        assert res_get.status_code == 200
+        data_get = res_get.json()
+        assert any("Separable" in s for s in data_get["steps"])
 

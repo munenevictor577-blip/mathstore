@@ -46,7 +46,9 @@ class StatsAnalyzer:
             try:
                 return [float(t) for t in tokens]
             except ValueError as e:
-                raise ValueError(f"Failed to parse numeric value from '{data_input}': {e}")
+                raise ValueError(
+                    f"Failed to parse numeric value from '{data_input}': {e}"
+                )
 
         raise ValueError(f"Unsupported data input type: {type(data_input).__name__}")
 
@@ -228,7 +230,7 @@ class StatsAnalyzer:
         if not 0.0 <= p <= 1.0:
             raise ValueError("Probability p must be between 0 and 1.")
         coeff = math.comb(n, k)
-        return float(coeff * (p ** k) * ((1.0 - p) ** (n - k)))
+        return float(coeff * (p**k) * ((1.0 - p) ** (n - k)))
 
     def binomial_cdf(self, k: int, n: int, p: float) -> float:
         """Cumulative Distribution Function P(X <= k) for Binomial(n, p)."""
@@ -244,7 +246,7 @@ class StatsAnalyzer:
             raise ValueError("k must be a non-negative integer.")
         if lambda_ <= 0:
             raise ValueError("Rate parameter lambda must be strictly positive.")
-        return float((lambda_ ** k) * math.exp(-lambda_) / math.factorial(k))
+        return float((lambda_**k) * math.exp(-lambda_) / math.factorial(k))
 
     def poisson_cdf(self, k: int, lambda_: float) -> float:
         """Cumulative Distribution Function P(X <= k) for Poisson(lambda)."""
@@ -290,7 +292,9 @@ class StatsAnalyzer:
         data = self.parse_data(data_input)
         n = len(data)
         if n < 2:
-            raise ValueError("Confidence interval calculation requires at least 2 data points.")
+            raise ValueError(
+                "Confidence interval calculation requires at least 2 data points."
+            )
 
         m = self.mean(data)
         s = self.std_dev(data)
@@ -309,9 +313,7 @@ class StatsAnalyzer:
 
         if format == "pretty":
             pct = int(confidence * 100)
-            return (
-                f"{pct}% CI: x̄ ± E = {m:.4f} ± {margin:.4f} = [{lower:.4f}, {upper:.4f}]"
-            )
+            return f"{pct}% CI: x̄ ± E = {m:.4f} ± {margin:.4f} = [{lower:.4f}, {upper:.4f}]"
 
         return (round(lower, 4), round(upper, 4), round(margin, 4))
 

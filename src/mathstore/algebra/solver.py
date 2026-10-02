@@ -14,7 +14,9 @@ class EquationSolver:
         try:
             var = sp.Symbol(variable)
             if "=" not in equation_str:
-                raise ValueError("Equation must contain '=' separating left and right sides.")
+                raise ValueError(
+                    "Equation must contain '=' separating left and right sides."
+                )
             parts = equation_str.split("=")
             if len(parts) != 2:
                 raise ValueError("Equation must contain exactly one '=' sign.")
@@ -33,7 +35,9 @@ class EquationSolver:
         except Exception as e:  # noqa: BLE001
             raise ValueError(f"Failed to parse or simplify the expression: {e}")
 
-    def format_solution(self, solutions: list, variable: str = "x", format: str = "str") -> str:
+    def format_solution(
+        self, solutions: list, variable: str = "x", format: str = "str"
+    ) -> str:
         """
         Formats equation solutions into standard text, LaTeX, or pretty Unicode.
 

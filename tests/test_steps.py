@@ -6,6 +6,7 @@ from mathstore.study.steps import (
     get_derivative_steps,
     get_equation_steps,
     get_integral_steps,
+    get_ode_steps,
 )
 
 
@@ -184,3 +185,22 @@ class TestEquationSteps:
         solver = EquationSolver()
         steps = solver.solve_steps("3*x - 9 = 0", variable="x")
         assert any("x = 3" in s for s in steps)
+
+
+class TestODESteps:
+    """Tests for ODE step-by-step breakdown."""
+
+    def test_ode_steps_separable(self):
+        steps = get_ode_steps("y' = x*y", variable="x", function="y")
+        assert len(steps) >= 5
+        text = "\n".join(steps)
+        assert "Separable First-Order ODE" in text
+        assert "Integrate both sides" in text
+
+    def test_ode_steps_linear(self):
+        steps = get_ode_steps("y' + 2*y = exp(x)", variable="x", function="y")
+        assert len(steps) >= 6
+        text = "\n".join(steps)
+        assert "First-Order Linear ODE" in text
+        assert "Integrating Factor" in text
+

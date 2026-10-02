@@ -25,7 +25,9 @@ def test_normalize_ode_string(solver: ODESolver) -> None:
     # Leibniz notation
     assert "Derivative(y(x), x)" in solver.normalize_ode_string("dy/dx + 2*y = exp(x)")
     assert "Derivative(y(x), x, 2)" in solver.normalize_ode_string("d2y/dx2 + 4*y = 0")
-    assert "Derivative(y(x), x, 2)" in solver.normalize_ode_string("d^2y/dx^2 + 4*y = 0")
+    assert "Derivative(y(x), x, 2)" in solver.normalize_ode_string(
+        "d^2y/dx^2 + 4*y = 0"
+    )
 
     # Bare y converted to y(x)
     assert "y(x)" in solver.normalize_ode_string("y' + 2*y = 0")
@@ -265,7 +267,9 @@ def test_parse_ics_extended(solver: ODESolver) -> None:
         solver.parse_ics([1, 2])
 
     # Unparseable ics format
-    with pytest.raises(ValueError, match="Could not parse initial condition specification"):
+    with pytest.raises(
+        ValueError, match="Could not parse initial condition specification"
+    ):
         solver.parse_ics("y[0] = 1")
 
     # Higher order Leibniz initial condition
@@ -301,7 +305,9 @@ def test_classify_extended_heuristics(solver: ODESolver) -> None:
     assert "Linear Differential Equation" in c_lin["primary_type"]
 
     # Exception in classify_ode
-    with patch("mathstore.ode.solver.classify_ode", side_effect=RuntimeError("SymPy error")):
+    with patch(
+        "mathstore.ode.solver.classify_ode", side_effect=RuntimeError("SymPy error")
+    ):
         c_err = solver.classify("y' + 2*y = 0")
         assert c_err["hints"] == []
 
@@ -310,6 +316,7 @@ def test_is_linear_and_homogeneous_extended(solver: ODESolver) -> None:
     x = sp.Symbol("x")
     dummy_eq = sp.Eq(x, 0)
     from unittest.mock import patch
+
     with patch.object(solver, "parse_equation", return_value=dummy_eq):
         assert solver.is_linear("dummy = 0") is False
         assert solver.is_homogeneous("dummy = 0") is False
@@ -323,7 +330,9 @@ def test_solve_extended(solver: ODESolver) -> None:
     assert "exp(x**2)" in sol
 
     # Exception in dsolve
-    with patch("mathstore.ode.solver.sp.dsolve", side_effect=RuntimeError("dsolve error")):
+    with patch(
+        "mathstore.ode.solver.sp.dsolve", side_effect=RuntimeError("dsolve error")
+    ):
         with pytest.raises(ValueError, match="Unable to find an analytical solution"):
             solver.solve("y' + 2*y = 0")
 
@@ -334,7 +343,9 @@ def test_check_solution_extended(solver: ODESolver) -> None:
     x = sp.Symbol("x")
     y = sp.Function("y")
     # sp.Eq
-    assert solver.check_solution("y' + 2*y = 0", sp.Eq(y(x), 3 * sp.exp(-2 * x))) is True
+    assert (
+        solver.check_solution("y' + 2*y = 0", sp.Eq(y(x), 3 * sp.exp(-2 * x))) is True
+    )
 
     # sp.Expr
     assert solver.check_solution("y' + 2*y = 0", 3 * sp.exp(-2 * x)) is True
@@ -355,7 +366,9 @@ def test_check_solution_extended(solver: ODESolver) -> None:
         solver.check_solution("y' = 0", [1, 2])  # type: ignore[arg-type]
 
     # checkodesol exception
-    with patch("mathstore.ode.solver.checkodesol", side_effect=RuntimeError("check error")):
+    with patch(
+        "mathstore.ode.solver.checkodesol", side_effect=RuntimeError("check error")
+    ):
         assert solver.check_solution("y' + 2*y = 0", "3*exp(-2*x)") is False
 
 
@@ -370,5 +383,50 @@ def test_format_solution_extended(solver: ODESolver) -> None:
 
     # Non-Eq solution in latex, pretty, str
     assert "e^{- 2 x}" in solver.format_solution(expr_sol, format="latex")
-    assert "ℯ" in solver.format_solution(expr_sol, format="pretty") or "e" in solver.format_solution(expr_sol, format="pretty")
+    assert "ℯ" in solver.format_solution(
+        expr_sol, format="pretty"
+    ) or "e" in solver.format_solution(expr_sol, format="pretty")
     assert "exp" in solver.format_solution(expr_sol, format="str")
+
+
+def test_get_steps_separable(solver: ODESolver) -> None:
+    steps = solver.get_steps("y' = x*y")
+    assert len(steps) >= 5
+    text = "\n".join(steps)
+    assert "Separable First-Order ODE" in text
+    assert "dx" in text
+    assert "dy" in text
+    assert "Integrate both sides" in text
+    assert "C1" in text
+
+    # Non-linear separable
+    steps2 = solver.get_steps("y' = y^2")
+    text2 = "\n".join(steps2)
+    assert "Separable First-Order ODE" in text2
+    assert "y(x) =" in text2
+
+
+def test_get_steps_linear(solver: ODESolver) -> None:
+    steps = solver.get_steps("y' + 2*y = exp(x)")
+    assert len(steps) >= 6
+    text = "\n".join(steps)
+    assert "First-Order Linear ODE" in text
+    assert "Integrating Factor" in text
+    assert "exp(2*x)" in text
+    assert "y(x) =" in text
+
+
+def test_get_steps_custom_variables(solver: ODESolver) -> None:
+    steps = solver.get_steps("v' + 2*v = 4", var="t", func="v")
+    text = "\n".join(steps)
+    assert "dv" in text or "v(t)" in text
+    assert "dt" in text
+
+
+def test_get_steps_fallback(solver: ODESolver) -> None:
+    # Higher order / non-linear that doesn't fit separable or 1st linear
+    steps = solver.get_steps("y'' + sin(y) = 0")
+    text = "\n".join(steps)
+    assert "Classify the equation" in text
+    assert "analytical method" in text
+

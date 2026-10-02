@@ -7,9 +7,9 @@ class CalculusAnalyzer:
     """Handles differentiation and integration, shielding user from Sympy internals."""
 
     def __init__(self):
-        self.x, self.y, self.z, self.t = sp.symbols('x y z t')
+        self.x, self.y, self.z, self.t = sp.symbols("x y z t")
 
-    def parse_expression(self, expression_str: str, variable: str = 'x') -> sp.Basic:
+    def parse_expression(self, expression_str: str, variable: str = "x") -> sp.Basic:
         """
         Parses a mathematical expression string into a SymPy expression object.
         Supports standard syntax and natural mathematical text like '2^x sin x',
@@ -18,7 +18,11 @@ class CalculusAnalyzer:
         return safe_sympify(expression_str, variable=variable)
 
     def differentiate(
-        self, expression_str: str, variable: str = 'x', order: int = 1, format: str = 'str'
+        self,
+        expression_str: str,
+        variable: str = "x",
+        order: int = 1,
+        format: str = "str",
     ) -> str:
         """
         Calculates the nth derivative of an algebraic expression.
@@ -34,9 +38,11 @@ class CalculusAnalyzer:
             var = sp.Symbol(variable)
             expr = self.parse_expression(expression_str, variable=variable)
             result = sp.diff(expr, var, order)
-            if format == 'latex':
-                return sp.latex(sp.Eq(sp.Derivative(expr, var, order), result, evaluate=False))
-            if format == 'pretty':
+            if format == "latex":
+                return sp.latex(
+                    sp.Eq(sp.Derivative(expr, var, order), result, evaluate=False)
+                )
+            if format == "pretty":
                 return sp.pretty(
                     sp.Eq(sp.Derivative(expr, var, order), result, evaluate=False),
                     use_unicode=True,
@@ -48,9 +54,9 @@ class CalculusAnalyzer:
     def integrate(
         self,
         expression_str: str,
-        variable: str = 'x',
+        variable: str = "x",
         limits: tuple[float, float] | None = None,
-        format: str = 'str',
+        format: str = "str",
     ) -> str:
         """
         Calculates either the indefinite or definite integral.
@@ -69,20 +75,30 @@ class CalculusAnalyzer:
             if limits is not None:
                 lower, upper = limits
                 result = sp.integrate(expr, (var, lower, upper))
-                if format == 'latex':
+                if format == "latex":
                     return sp.latex(
-                        sp.Eq(sp.Integral(expr, (var, lower, upper)), result, evaluate=False)
+                        sp.Eq(
+                            sp.Integral(expr, (var, lower, upper)),
+                            result,
+                            evaluate=False,
+                        )
                     )
-                if format == 'pretty':
+                if format == "pretty":
                     return sp.pretty(
-                        sp.Eq(sp.Integral(expr, (var, lower, upper)), result, evaluate=False),
+                        sp.Eq(
+                            sp.Integral(expr, (var, lower, upper)),
+                            result,
+                            evaluate=False,
+                        ),
                         use_unicode=True,
                     )
             else:
                 result = sp.integrate(expr, var)
-                if format == 'latex':
-                    return sp.latex(sp.Eq(sp.Integral(expr, var), result, evaluate=False))
-                if format == 'pretty':
+                if format == "latex":
+                    return sp.latex(
+                        sp.Eq(sp.Integral(expr, var), result, evaluate=False)
+                    )
+                if format == "pretty":
                     return sp.pretty(
                         sp.Eq(sp.Integral(expr, var), result, evaluate=False),
                         use_unicode=True,
@@ -96,8 +112,8 @@ class CalculusAnalyzer:
         self,
         expression_str: str,
         limits: float | sp.Basic | str,
-        variable: str = 'x',
-        format: str = 'str',
+        variable: str = "x",
+        format: str = "str",
     ) -> str:
         """
         Calculates the limit of a mathematical expression.
@@ -114,9 +130,11 @@ class CalculusAnalyzer:
             expr = self.parse_expression(expression_str, variable=variable)
             target = safe_sympify(limits, variable=variable)
             result = sp.limit(expr, var, target)
-            if format == 'latex':
-                return sp.latex(sp.Eq(sp.Limit(expr, var, target), result, evaluate=False))
-            if format == 'pretty':
+            if format == "latex":
+                return sp.latex(
+                    sp.Eq(sp.Limit(expr, var, target), result, evaluate=False)
+                )
+            if format == "pretty":
                 return sp.pretty(
                     sp.Eq(sp.Limit(expr, var, target), result, evaluate=False),
                     use_unicode=True,
@@ -126,7 +144,7 @@ class CalculusAnalyzer:
             raise ValueError(f"Calculus error during limit calculation: {e}")
 
     def differentiate_steps(
-        self, expression_str: str, variable: str = 'x', order: int = 1
+        self, expression_str: str, variable: str = "x", order: int = 1
     ) -> list[str]:
         """
         Returns step-by-step differentiation of an expression.
@@ -143,7 +161,7 @@ class CalculusAnalyzer:
     def integrate_steps(
         self,
         expression_str: str,
-        variable: str = 'x',
+        variable: str = "x",
         limits: tuple[float, float] | None = None,
     ) -> list[str]:
         """
@@ -157,5 +175,3 @@ class CalculusAnalyzer:
         from mathstore.study.steps import get_integral_steps
 
         return get_integral_steps(expression_str, variable=variable, limits=limits)
-
-        

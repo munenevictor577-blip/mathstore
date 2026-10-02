@@ -17,5 +17,3 @@ def test_init_exports():
     assert hasattr(mathstore, "get_reference")
     assert hasattr(mathstore, "list_topics")
     assert hasattr(mathstore, "main")
-
-

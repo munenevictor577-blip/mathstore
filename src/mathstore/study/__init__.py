@@ -11,6 +11,7 @@ from mathstore.study.steps import (
     get_derivative_steps,
     get_equation_steps,
     get_integral_steps,
+    get_ode_steps,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "get_derivative_steps",
     "get_equation_steps",
     "get_integral_steps",
+    "get_ode_steps",
 ]

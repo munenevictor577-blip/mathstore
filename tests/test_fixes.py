@@ -22,7 +22,16 @@ class TestSecuritySafeParsing:
             safe_sympify("__import__('os').system('echo pwned')")
 
     def test_safe_sympify_blocks_keywords(self):
-        for word in ["import", "eval", "exec", "open", "builtins", "subprocess", "os", "sys"]:
+        for word in [
+            "import",
+            "eval",
+            "exec",
+            "open",
+            "builtins",
+            "subprocess",
+            "os",
+            "sys",
+        ]:
             with pytest.raises(ValueError, match="forbidden pattern detected"):
                 safe_sympify(f"{word}('something')")
 
@@ -173,7 +182,9 @@ class TestAPIStatisticsResponseSchemas:
 
     def test_stats_summary_response(self):
         client = TestClient(app)
-        res = client.post("/math/stats/summary", json={"data": "10, 12, 14", "format": "str"})
+        res = client.post(
+            "/math/stats/summary", json={"data": "10, 12, 14", "format": "str"}
+        )
         assert res.status_code == 200
         data = res.json()
         assert "data" in data

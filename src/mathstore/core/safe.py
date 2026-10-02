@@ -53,7 +53,9 @@ def safe_sympify(
 
     for pat in DANGEROUS_PATTERNS:
         if re.search(pat, raw, flags=re.IGNORECASE):
-            raise ValueError("Invalid or unsafe expression: forbidden pattern detected.")
+            raise ValueError(
+                "Invalid or unsafe expression: forbidden pattern detected."
+            )
 
     # Normalize mathematical symbols
     cleaned = raw.replace("·", "*").replace("×", "*")
@@ -88,9 +90,13 @@ def safe_sympify(
         locs.update(locals_dict)
 
     try:
-        return parse_expr(cleaned, local_dict=locs, transformations=CALCULUS_TRANSFORMATIONS)
+        return parse_expr(
+            cleaned, local_dict=locs, transformations=CALCULUS_TRANSFORMATIONS
+        )
     except Exception:
         try:
             return sp.sympify(cleaned, locals=locs)
         except Exception as e:
-            raise ValueError(f"Failed to parse mathematical expression '{text}': {e}") from e
+            raise ValueError(
+                f"Failed to parse mathematical expression '{text}': {e}"
+            ) from e

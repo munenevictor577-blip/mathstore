@@ -22,7 +22,9 @@ VALID_OPERATIONS = {
 }
 
 
-@router.post("/{operation}", response_model=MatrixResponse, summary="Perform matrix operation")
+@router.post(
+    "/{operation}", response_model=MatrixResponse, summary="Perform matrix operation"
+)
 def matrix_operation(operation: str, req: MatrixRequest) -> MatrixResponse:
     """Executes a linear algebra operation on a given matrix string."""
     op_lower = operation.lower().strip()

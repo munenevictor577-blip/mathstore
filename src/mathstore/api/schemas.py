@@ -5,7 +5,9 @@ from pydantic import BaseModel, Field
 
 # --- Calculus Schemas ---
 class DiffRequest(BaseModel):
-    expression: str = Field(..., description="Mathematical expression, e.g. 'x**2 * sin(x)'")
+    expression: str = Field(
+        ..., description="Mathematical expression, e.g. 'x**2 * sin(x)'"
+    )
     variable: str = Field("x", description="Variable to differentiate with respect to")
     order: int = Field(1, ge=1, description="Derivative order (default: 1)")
     steps: bool = Field(False, description="Include step-by-step derivation breakdown")
@@ -42,7 +44,9 @@ class IntegrateResponse(BaseModel):
 
 class LimitRequest(BaseModel):
     expression: str = Field(..., description="Mathematical expression, e.g. 'sin(x)/x'")
-    target: str = Field(..., description="Value the variable approaches, e.g. '0', 'oo', '-oo'")
+    target: str = Field(
+        ..., description="Value the variable approaches, e.g. '0', 'oo', '-oo'"
+    )
     variable: str = Field("x", description="Variable for limit")
     format: str = Field("str", description="Output format: 'str', 'latex', or 'pretty'")
 
@@ -58,7 +62,8 @@ class LimitResponse(BaseModel):
 # --- Algebra Schemas ---
 class SolveRequest(BaseModel):
     equation: str = Field(
-        ..., description="Equation to solve, e.g. '2*x + 4 = 10' or 'x**2 - 5*x + 6 = 0'"
+        ...,
+        description="Equation to solve, e.g. '2*x + 4 = 10' or 'x**2 - 5*x + 6 = 0'",
     )
     variable: str = Field("x", description="Variable to isolate")
     steps: bool = Field(False, description="Include step-by-step algebraic breakdown")
@@ -125,7 +130,9 @@ class PoissonRequest(BaseModel):
 
 class ConfidenceIntervalRequest(BaseModel):
     data: str | list[float] = Field(..., description="Sample dataset")
-    confidence: float = Field(0.95, gt=0.0, lt=1.0, description="Confidence level (default: 0.95)")
+    confidence: float = Field(
+        0.95, gt=0.0, lt=1.0, description="Confidence level (default: 0.95)"
+    )
     format: str = Field("str", description="Output format: 'str', 'latex', or 'pretty'")
 
 
@@ -133,7 +140,8 @@ class TTestRequest(BaseModel):
     data: str | list[float] = Field(..., description="Sample dataset")
     pop_mean: float = Field(..., description="Null hypothesis population mean")
     alternative: str = Field(
-        "two-sided", description="Alternative hypothesis: 'two-sided', 'greater', or 'less'"
+        "two-sided",
+        description="Alternative hypothesis: 'two-sided', 'greater', or 'less'",
     )
     format: str = Field("str", description="Output format: 'str', 'latex', or 'pretty'")
 
@@ -196,7 +204,9 @@ class DerivativeStepsRequest(BaseModel):
 class IntegralStepsRequest(BaseModel):
     expression: str = Field(..., description="Expression to integrate")
     variable: str = Field("x", description="Variable of integration")
-    limits: tuple[float, float] | None = Field(None, description="Definite integral bounds")
+    limits: tuple[float, float] | None = Field(
+        None, description="Definite integral bounds"
+    )
 
 
 class EquationStepsRequest(BaseModel):
@@ -255,16 +265,21 @@ class ReferenceResponse(BaseModel):
 class ODESolveRequest(BaseModel):
     equation: str = Field(
         ...,
-        description="Ordinary differential equation, e.g. \"y' + 2*y = exp(x)\" or \"y'' + 4*y = 0\"",
+        description='Ordinary differential equation, e.g. "y\' + 2*y = exp(x)" or "y\'\' + 4*y = 0"',
     )
     ics: str | None = Field(
         None,
-        description="Optional initial conditions, e.g. \"y(0) = 1, y'(0) = 2\"",
+        description='Optional initial conditions, e.g. "y(0) = 1, y\'(0) = 2"',
     )
     variable: str = Field("x", description="Independent variable name (default: 'x')")
     function: str = Field("y", description="Dependent function name (default: 'y')")
-    hint: str = Field("default", description="Optional SymPy solving hint (default: 'default')")
-    format: str = Field("str", description="Output format: 'str', 'latex', 'pretty', or 'rhs'")
+    hint: str = Field(
+        "default", description="Optional SymPy solving hint (default: 'default')"
+    )
+    format: str = Field(
+        "str", description="Output format: 'str', 'latex', 'pretty', or 'rhs'"
+    )
+    steps: bool = Field(False, description="Include step-by-step derivation breakdown")
 
 
 class ODESolveResponse(BaseModel):
@@ -274,6 +289,13 @@ class ODESolveResponse(BaseModel):
     solution: str | list[str]
     format: str
     ics: str | None = None
+    steps: list[str] | None = None
+
+
+class ODEStepsRequest(BaseModel):
+    equation: str = Field(..., description="Differential equation to explain")
+    variable: str = Field("x", description="Independent variable name (default: 'x')")
+    function: str = Field("y", description="Dependent function name (default: 'y')")
 
 
 class ODEClassifyRequest(BaseModel):
@@ -306,4 +328,3 @@ class ODECheckResponse(BaseModel):
     variable: str
     function: str
     is_valid: bool
-
