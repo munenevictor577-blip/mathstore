@@ -1,16 +1,11 @@
 import random
-import re
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from typing import Any
-
 import sympy as sp
 
-from mathstore.core.safe import safe_sympify
+from mathstore.study.practice.models import PracticeQuestion
 from mathstore.study.steps import (
     get_derivative_steps,
-    get_equation_steps,
     get_integral_steps,
+    get_equation_steps
 )
 
 TOPIC_ALIASES = {
@@ -40,25 +35,20 @@ TOPIC_ALIASES = {
 
 CANONICAL_TOPICS = ["derivatives", "integrals", "algebra", "matrix", "stats"]
 
-
-@dataclass
-class PracticeQuestion:
-    """Represents an interactive practice problem with solutions, hints, and validation metadata."""
-
-    topic: str
-    difficulty: str
-    prompt: str
-    expected_answer: str
-    hint: str
-    steps: list[str] = field(default_factory=list)
-    question_type: str = (
-        "symbolic"  # "derivative", "integral", "roots", "number", "symbolic"
-    )
-    correct_value: Any = None
-    variable: str = "x"
-    is_definite: bool = False
-    tolerance: float = 1e-2
-    subtype: str = ""
+__all__ = [
+    "CANONICAL_TOPICS",
+    "TOPIC_ALIASES",
+    "_gen_algebra_question",
+    "_gen_derivative_question",
+    "_gen_integral_question",
+    "_gen_matrix_question",
+    "_gen_stats_question",
+    "_randint_nonzero",
+    "_select_subtype",
+    "generate_question",
+    "randit_nonzero",
+    "randint_nonzero",
+]
 
 
 def _select_subtype(
@@ -72,7 +62,6 @@ def _select_subtype(
         if candidates:
             return rng.choice(candidates)
     return rng.choice(subtypes)
-
 
 def randint_nonzero(
     rng: random.Random,
@@ -88,161 +77,7 @@ def randint_nonzero(
 
 
 _randint_nonzero = randint_nonzero
-
-def _normalize_input_str(text: str) -> str:
-    cleaned = text.strip()
-    # Replace carets with double asterisks for exponents
-    cleaned = cleaned.replace("^", "**")
-    # Remove leading variable / derivative / function assignments
-    cleaned = re.sub(
-        r"^(?:(?:d[a-zA-Z]/d[a-zA-Z])|(?:[a-zA-Z](?:'|\([a-zA-Z]\))*))\s*=\s*",
-        "",
-        cleaned,
-    )
-    cleaned = re.sub(r"^ans\s*=\s*", "", cleaned, flags=re.IGNORECASE)
-    return cleaned.strip()
-
-
-def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str]:
-    """
-    Validates a student's answer using symbolic equivalence or numeric tolerance.
-
-    Returns:
-        tuple of (is_correct: bool, feedback: str)
-    """
-    if not user_input or not user_input.strip():
-        return False, "Empty answer. Please enter a mathematical expression or value."
-
-    raw = user_input.strip()
-
-    if raw.lower() in ("hint", "skip", "quit", "exit"):
-        return False, f"Command '{raw}' entered."
-
-    q_type = question.question_type
-
-    if q_type == "roots":
-        try:
-            cleaned = re.sub(r"[a-zA-Z]\s*=\s*", "", raw)
-            cleaned = cleaned.strip("[]{}()")
-            parts = [p.strip() for p in cleaned.split(",") if p.strip()]
-            if not parts:
-                return False, "Could not identify any roots in your answer."
-            user_roots = {
-                safe_sympify(
-                    _normalize_input_str(p),
-                    locals_dict={"sqrt": sp.sqrt, "I": sp.I, "pi": sp.pi, "E": sp.E},
-                )
-                for p in parts
-            }
-            if question.correct_value is not None:
-                if isinstance(question.correct_value, (list, tuple, set)):
-                    raw_correct = list(question.correct_value)
-                else:
-                    raw_correct = [question.correct_value]
-            else:
-                ans_cleaned = re.sub(
-                    r"[a-zA-Z]\s*=\s*", "", question.expected_answer
-                ).strip("[]{}()")
-                raw_correct = [p.strip() for p in ans_cleaned.split(",") if p.strip()]
-
-            correct_roots = {
-                safe_sympify(
-                    _normalize_input_str(str(r)),
-                    locals_dict={"sqrt": sp.sqrt, "I": sp.I, "pi": sp.pi, "E": sp.E},
-                )
-                for r in raw_correct
-            }
-            if user_roots == correct_roots:
-                return True, "✓ Correct! All roots match."
-            return (
-                False,
-                f"Roots do not match. Expected {len(correct_roots)} root(s). Try again or type 'hint'.",
-            )
-        except Exception as e:  # noqa: BLE001
-            return False, f"Could not parse roots format (use e.g. '2, 3'): {e}"
-
-    if q_type == "number":
-        try:
-            norm = _normalize_input_str(raw)
-            val = float(safe_sympify(norm))
-            target_raw = (
-                question.correct_value
-                if question.correct_value is not None
-                else question.expected_answer
-            )
-            target = float(safe_sympify(_normalize_input_str(str(target_raw))))
-            if abs(val - target) <= question.tolerance:
-                return True, "✓ Correct!"
-            return (
-                False,
-                f"Numerical value is incorrect (got {val:.4f}). Try again or type 'hint'.",
-            )
-        except Exception as e:  # noqa: BLE001
-            return False, f"Could not parse numerical value: {e}"
-
-    if q_type == "integral":
-        try:
-            norm = _normalize_input_str(raw)
-            c_sym = sp.Symbol("C")
-            c_lower = sp.Symbol("c")
-            user_expr = safe_sympify(norm, locals_dict={"C": c_sym, "c": c_lower})
-            var = sp.Symbol(question.variable)
-
-            target_raw = (
-                question.correct_value
-                if question.correct_value is not None
-                else question.expected_answer
-            )
-            if isinstance(target_raw, str):
-                target_norm = re.sub(r"\s*\+\s*[cC]$", "", target_raw.strip())
-            else:
-                target_norm = str(target_raw)
-
-            if question.is_definite:
-                target = safe_sympify(target_norm)
-                if sp.simplify(user_expr - target) == 0:
-                    return True, "✓ Correct!"
-                try:
-                    if abs(float(user_expr) - float(target)) <= question.tolerance:
-                        return True, "✓ Correct!"
-                except (TypeError, ValueError):
-                    pass
-                return (
-                    False,
-                    "Calculated definite integral is incorrect. Try again or type 'hint'.",
-                )
-
-            # Indefinite integral: derivative of difference with respect to var must be 0
-            target_expr = safe_sympify(
-                target_norm, locals_dict={"C": c_sym, "c": c_lower}
-            )
-            diff_wrt_var = sp.diff(user_expr - target_expr, var)
-            if sp.simplify(diff_wrt_var) == 0:
-                return (
-                    True,
-                    "✓ Correct! (Antiderivative is equivalent up to an additive constant)",
-                )
-            return False, "Antiderivative does not match. Try again or type 'hint'."
-        except Exception as e:  # noqa: BLE001
-            return False, f"Syntax error in mathematical expression: {e}"
-
-    if q_type in ("derivative", "symbolic"):
-        try:
-            norm = _normalize_input_str(raw)
-            user_expr = safe_sympify(norm)
-            target_raw = (
-                question.correct_value
-                if question.correct_value is not None
-                else question.expected_answer
-            )
-            target = safe_sympify(str(target_raw))
-            if sp.simplify(user_expr - target) == 0:
-                return True, "✓ Correct!"
-            return False, "Expression does not match. Try again or type 'hint'."
-        except Exception as e:  # noqa: BLE001
-            return False, f"Syntax error in expression: {e}"
-
-    return False, "Unsupported question type."
+randit_nonzero = randint_nonzero
 
 
 def _gen_derivative_question(
@@ -377,7 +212,6 @@ def _gen_derivative_question(
         variable="x",
         subtype=choice,
     )
-
 
 def _gen_integral_question(
     difficulty: str,
@@ -657,8 +491,8 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
                 question_type="number",
                 correct_value=float(trace_val),
             )
-        a = _randint_nonzero(rng, -7, 7)
-        d = _randint_nonzero(rng, -7, 7)
+        a = randint_nonzero(rng, -7, 7)
+        d = randint_nonzero(rng, -7, 7)
         det_val = a * d
         prompt = f"Find the determinant of the diagonal matrix A = [[{a}, 0], [0, {d}]]"
         hint = "For a diagonal matrix, det is the product of diagonal elements: det = a11 * a22."
@@ -725,9 +559,9 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
             question_type="number",
             correct_value=float(trace_val),
         )
-    d1 = _randint_nonzero(rng, -8, 8)
-    d2 = _randint_nonzero(rng, -8, 8)
-    d3 = _randint_nonzero(rng, -8, 8)
+    d1 = randint_nonzero(rng, -8, 8)
+    d2 = randint_nonzero(rng, -8, 8)
+    d3 = randint_nonzero(rng, -8, 8)
     det_val = d1 * d2 * d3
     prompt = f"Find the determinant of upper-triangular matrix A = [[{d1}, 3, 1], [0, {d2}, 4], [0, 0, {d3}]]"
     hint = "For any triangular matrix, determinant equals the product of its diagonal entries."
@@ -898,174 +732,3 @@ def generate_question(
         return _gen_stats_question(chosen_diff, rng)
 
     return _gen_derivative_question(chosen_diff, rng, exclude_subtypes=exclude_subtypes)
-
-
-def format_question_card(q: PracticeQuestion, index: int | None = None) -> str:
-    """Formats a single practice question with hints, answers, and steps for non-interactive output."""
-    prefix = f"Question #{index}: " if index is not None else ""
-    lines = [
-        f"[{q.topic.upper()}] (Difficulty: {q.difficulty})",
-        f"{prefix}{q.prompt}",
-        f"Hint: {q.hint}",
-        f"Expected Answer: {q.expected_answer}",
-        "Step-by-step solution:",
-    ]
-    for idx, s in enumerate(q.steps, 1):
-        lines.append(f"  {idx}. {s}")
-    return "\n".join(lines)
-
-
-class PracticeSession:
-    """Interactive CLI practice quizzer with score tracking, hints, and derivations."""
-
-    def __init__(
-        self,
-        topic: str = "all",
-        count: int = 5,
-        difficulty: str = "medium",
-        seed: int | None = None,
-        input_func: Callable[[str], str] | None = None,
-        print_func: Callable[..., None] | None = None,
-    ):
-        self.topic = topic
-        self.count = max(1, count)
-        self.difficulty = difficulty
-        self.rng = random.Random(seed)
-        self.input_func = input_func if input_func is not None else input
-        self.print_func = print_func if print_func is not None else print
-
-    def run(self) -> dict[str, Any]:
-        """Runs the interactive practice session."""
-        self.print_func("=" * 60)
-        self.print_func("  MathStore University Practice & Revision Quizzer")
-        self.print_func(
-            f"  Topic: {self.topic.capitalize()} | Difficulty: {self.difficulty.capitalize()} | Questions: {self.count}"
-        )
-        self.print_func(
-            "  Commands: 'hint' for a hint, 'skip' to reveal solution, 'quit' to exit."
-        )
-        self.print_func("=" * 60)
-
-        score = 0
-        skipped = 0
-        completed = 0
-        seen_prompts: set[str] = set()
-        used_subtypes: set[str] = set()
-
-        for i in range(1, self.count + 1):
-            q = generate_question(
-                topic=self.topic,
-                difficulty=self.difficulty,
-                rng=self.rng,
-                exclude_subtypes=used_subtypes,
-            )
-            # Avoid repeating the same question during a session
-            retry_count = 0
-            while q.prompt in seen_prompts and retry_count < 30:
-                q = generate_question(
-                    topic=self.topic,
-                    difficulty=self.difficulty,
-                    rng=self.rng,
-                    exclude_subtypes=used_subtypes,
-                )
-                retry_count += 1
-            seen_prompts.add(q.prompt)
-            if q.subtype:
-                used_subtypes.add(q.subtype)
-
-            self.print_func(
-                f"\n[Question {i}/{self.count}] ({q.topic.capitalize()} - {q.difficulty})"
-            )
-            self.print_func(f"  {q.prompt}")
-
-            attempts = 0
-            while True:
-                try:
-                    user_resp = self.input_func("  Your answer > ").strip()
-                except (EOFError, KeyboardInterrupt):
-                    self.print_func("\nSession ended by user.")
-                    return {
-                        "total": self.count,
-                        "completed": completed,
-                        "correct": score,
-                        "skipped": skipped,
-                        "percentage": (score / max(1, completed)) * 100
-                        if completed
-                        else 0.0,
-                    }
-
-                if user_resp.lower() == "quit":
-                    self.print_func("\nExiting practice session early...")
-                    self._show_summary(score, completed, skipped)
-                    return {
-                        "total": self.count,
-                        "completed": completed,
-                        "correct": score,
-                        "skipped": skipped,
-                        "percentage": (score / max(1, completed)) * 100
-                        if completed
-                        else 0.0,
-                    }
-
-                if user_resp.lower() == "hint":
-                    self.print_func(f"  💡 Hint: {q.hint}")
-                    continue
-
-                if user_resp.lower() == "skip":
-                    self.print_func(
-                        f"  ⏭ Skipped. Expected answer: {q.expected_answer}"
-                    )
-                    self.print_func("  Step-by-step solution:")
-                    for idx, s in enumerate(q.steps, 1):
-                        self.print_func(f"    {idx}. {s}")
-                    skipped += 1
-                    completed += 1
-                    break
-
-                is_correct, feedback = check_answer(user_resp, q)
-                if is_correct:
-                    self.print_func(f"  {feedback}")
-                    score += 1
-                    completed += 1
-                    break
-
-                attempts += 1
-                self.print_func(f"  ✗ {feedback}")
-                if attempts >= 2:
-                    self.print_func(f"  The correct answer was: {q.expected_answer}")
-                    self.print_func("  Step-by-step solution:")
-                    for idx, s in enumerate(q.steps, 1):
-                        self.print_func(f"    {idx}. {s}")
-                    completed += 1
-                    break
-
-        self._show_summary(score, completed, skipped)
-        pct = (score / max(1, completed)) * 100 if completed else 0.0
-        return {
-            "total": self.count,
-            "completed": completed,
-            "correct": score,
-            "skipped": skipped,
-            "percentage": pct,
-        }
-
-    def _show_summary(self, score: int, completed: int, skipped: int) -> None:
-        self.print_func("\n" + "=" * 60)
-        self.print_func("  Practice Quiz Completed!")
-        pct = (score / max(1, completed)) * 100 if completed else 0.0
-        self.print_func(f"  Questions Attempted: {completed}/{self.count}")
-        self.print_func(f"  Correct Answers:     {score}")
-        self.print_func(f"  Skipped:             {skipped}")
-        self.print_func(f"  Score:               {pct:.1f}%")
-
-        if pct >= 80.0:
-            self.print_func("  🌟 Outstanding! You have mastered these concepts.")
-        elif pct >= 60.0:
-            self.print_func(
-                "  👍 Good effort! Review the tricky derivations and try again."
-            )
-        else:
-            self.print_func(
-                "  📚 Keep revising! Use 'mathstore ref' to consult cheat sheets."
-            )
-        self.print_func("=" * 60)

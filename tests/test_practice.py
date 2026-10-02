@@ -671,3 +671,110 @@ class TestPracticeFormattingAndSession:
 
             assert len(set(subtypes)) == 5, f"Seed {seed} had non-unique subtypes: {subtypes}"
             assert subtypes.count("chain_exp") <= 1
+
+
+class TestPracticeRefactoredSubmodules:
+    """Verifies that the refactored modular practice package and submodules expose expected interfaces."""
+
+    def test_submodule_direct_imports(self):
+        """Direct submodule imports should function cleanly without circular dependencies."""
+        from mathstore.study.practice.evaluators import (
+            _normalize_input_str,
+            check_answer,
+        )
+        from mathstore.study.practice.generators import (
+            CANONICAL_TOPICS,
+            TOPIC_ALIASES,
+            _gen_algebra_question,
+            _gen_derivative_question,
+            _gen_integral_question,
+            _gen_matrix_question,
+            _gen_stats_question,
+            _randint_nonzero,
+            _select_subtype,
+            generate_question,
+            randit_nonzero,
+            randint_nonzero,
+        )
+        from mathstore.study.practice.models import PracticeQuestion
+        from mathstore.study.practice.session import (
+            PracticeSession,
+            format_question_card,
+        )
+
+        assert callable(check_answer)
+        assert callable(_normalize_input_str)
+        assert callable(generate_question)
+        assert callable(randint_nonzero)
+        assert callable(_randint_nonzero)
+        assert callable(randit_nonzero)
+        assert callable(_select_subtype)
+        assert callable(_gen_algebra_question)
+        assert callable(_gen_derivative_question)
+        assert callable(_gen_integral_question)
+        assert callable(_gen_matrix_question)
+        assert callable(_gen_stats_question)
+        assert isinstance(CANONICAL_TOPICS, list)
+        assert isinstance(TOPIC_ALIASES, dict)
+        assert PracticeQuestion is not None
+        assert PracticeSession is not None
+        assert callable(format_question_card)
+
+    def test_package_facade_reexports(self):
+        """mathstore.study.practice facade should re-export all symbols identically to submodules."""
+        import mathstore.study.practice as practice_pkg
+        from mathstore.study.practice import evaluators, generators, models, session
+
+        assert practice_pkg.PracticeQuestion is models.PracticeQuestion
+        assert practice_pkg.check_answer is evaluators.check_answer
+        assert practice_pkg._normalize_input_str is evaluators._normalize_input_str
+        assert practice_pkg.generate_question is generators.generate_question
+        assert practice_pkg.CANONICAL_TOPICS is generators.CANONICAL_TOPICS
+        assert practice_pkg.TOPIC_ALIASES is generators.TOPIC_ALIASES
+        assert practice_pkg.randint_nonzero is generators.randint_nonzero
+        assert practice_pkg._randint_nonzero is generators._randint_nonzero
+        assert practice_pkg.randit_nonzero is generators.randit_nonzero
+        assert practice_pkg._select_subtype is generators._select_subtype
+        assert practice_pkg.PracticeSession is session.PracticeSession
+        assert practice_pkg.format_question_card is session.format_question_card
+
+    def test_top_level_study_reexports(self):
+        """mathstore.study facade must maintain backward compatibility for practice symbols."""
+        from mathstore.study import (
+            CANONICAL_TOPICS,
+            PracticeQuestion,
+            PracticeSession,
+            check_answer,
+            format_question_card,
+            generate_question,
+        )
+        from mathstore.study.practice import (
+            CANONICAL_TOPICS as PKG_CANONICAL,
+            PracticeQuestion as PKG_Question,
+            PracticeSession as PKG_Session,
+            check_answer as pkg_check,
+            format_question_card as pkg_format,
+            generate_question as pkg_generate,
+        )
+
+        assert CANONICAL_TOPICS is PKG_CANONICAL
+        assert PracticeQuestion is PKG_Question
+        assert PracticeSession is PKG_Session
+        assert check_answer is pkg_check
+        assert format_question_card is pkg_format
+        assert generate_question is pkg_generate
+
+    def test_all_exports_exist(self):
+        """Every symbol listed in __all__ across all practice modules must exist."""
+        from mathstore.study.practice import (
+            evaluators,
+            generators,
+            models,
+            session,
+        )
+        import mathstore.study.practice as practice_pkg
+
+        for mod in (practice_pkg, evaluators, generators, models, session):
+            assert hasattr(mod, "__all__")
+            for symbol_name in mod.__all__:
+                assert hasattr(mod, symbol_name), f"{mod.__name__} missing exported symbol {symbol_name}"
