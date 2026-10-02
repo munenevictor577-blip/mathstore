@@ -1,16 +1,11 @@
 import random
-import re
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from typing import Any
-
 import sympy as sp
 
-from mathstore.core.safe import safe_sympify
+from mathstore.study.practice.models import PracticeQuestion
 from mathstore.study.steps import (
     get_derivative_steps,
-    get_equation_steps,
     get_integral_steps,
+    get_equation_steps
 )
 
 TOPIC_ALIASES = {
@@ -40,186 +35,60 @@ TOPIC_ALIASES = {
 
 CANONICAL_TOPICS = ["derivatives", "integrals", "algebra", "matrix", "stats"]
 
-
-@dataclass
-class PracticeQuestion:
-    """Represents an interactive practice problem with solutions, hints, and validation metadata."""
-
-    topic: str
-    difficulty: str
-    prompt: str
-    expected_answer: str
-    hint: str
-    steps: list[str] = field(default_factory=list)
-    question_type: str = (
-        "symbolic"  # "derivative", "integral", "roots", "number", "symbolic"
-    )
-    correct_value: Any = None
-    variable: str = "x"
-    is_definite: bool = False
-    tolerance: float = 1e-2
+__all__ = [
+    "CANONICAL_TOPICS",
+    "TOPIC_ALIASES",
+    "_gen_algebra_question",
+    "_gen_derivative_question",
+    "_gen_integral_question",
+    "_gen_matrix_question",
+    "_gen_stats_question",
+    "_randint_nonzero",
+    "_select_subtype",
+    "generate_question",
+    "randit_nonzero",
+    "randint_nonzero",
+]
 
 
-def _normalize_input_str(text: str) -> str:
-    cleaned = text.strip()
-    # Replace carets with double asterisks for exponents
-    cleaned = cleaned.replace("^", "**")
-    # Remove leading variable / derivative / function assignments
-    cleaned = re.sub(
-        r"^(?:(?:d[a-zA-Z]/d[a-zA-Z])|(?:[a-zA-Z](?:'|\([a-zA-Z]\))*))\s*=\s*",
-        "",
-        cleaned,
-    )
-    cleaned = re.sub(r"^ans\s*=\s*", "", cleaned, flags=re.IGNORECASE)
-    return cleaned.strip()
+def _select_subtype(
+    rng: random.Random,
+    subtypes: list[str],
+    exclude_subtypes: set[str] | list[str] | None = None,
+) -> str:
+    """Select a question subtype, preferring ones not yet used in the session."""
+    if exclude_subtypes:
+        candidates = [s for s in subtypes if s not in exclude_subtypes]
+        if candidates:
+            return rng.choice(candidates)
+    return rng.choice(subtypes)
+
+def randint_nonzero(
+    rng: random.Random,
+    low: int,
+    high: int,
+    exclude: tuple[int, ...] | set[int] = (0,),
+) -> int:
+    """Generate a random integer in [low, high] excluding zero and any optional excluded values."""
+    val = rng.randint(low, high)
+    while val in exclude:
+        val = rng.randint(low, high)
+    return val
 
 
-def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str]:
-    """
-    Validates a student's answer using symbolic equivalence or numeric tolerance.
-
-    Returns:
-        tuple of (is_correct: bool, feedback: str)
-    """
-    if not user_input or not user_input.strip():
-        return False, "Empty answer. Please enter a mathematical expression or value."
-
-    raw = user_input.strip()
-
-    if raw.lower() in ("hint", "skip", "quit", "exit"):
-        return False, f"Command '{raw}' entered."
-
-    q_type = question.question_type
-
-    if q_type == "roots":
-        try:
-            cleaned = re.sub(r"[a-zA-Z]\s*=\s*", "", raw)
-            cleaned = cleaned.strip("[]{}()")
-            parts = [p.strip() for p in cleaned.split(",") if p.strip()]
-            if not parts:
-                return False, "Could not identify any roots in your answer."
-            user_roots = {
-                safe_sympify(
-                    _normalize_input_str(p),
-                    locals_dict={"sqrt": sp.sqrt, "I": sp.I, "pi": sp.pi, "E": sp.E},
-                )
-                for p in parts
-            }
-            if question.correct_value is not None:
-                if isinstance(question.correct_value, (list, tuple, set)):
-                    raw_correct = list(question.correct_value)
-                else:
-                    raw_correct = [question.correct_value]
-            else:
-                ans_cleaned = re.sub(
-                    r"[a-zA-Z]\s*=\s*", "", question.expected_answer
-                ).strip("[]{}()")
-                raw_correct = [p.strip() for p in ans_cleaned.split(",") if p.strip()]
-
-            correct_roots = {
-                safe_sympify(
-                    _normalize_input_str(str(r)),
-                    locals_dict={"sqrt": sp.sqrt, "I": sp.I, "pi": sp.pi, "E": sp.E},
-                )
-                for r in raw_correct
-            }
-            if user_roots == correct_roots:
-                return True, "✓ Correct! All roots match."
-            return (
-                False,
-                f"Roots do not match. Expected {len(correct_roots)} root(s). Try again or type 'hint'.",
-            )
-        except Exception as e:  # noqa: BLE001
-            return False, f"Could not parse roots format (use e.g. '2, 3'): {e}"
-
-    if q_type == "number":
-        try:
-            norm = _normalize_input_str(raw)
-            val = float(safe_sympify(norm))
-            target_raw = (
-                question.correct_value
-                if question.correct_value is not None
-                else question.expected_answer
-            )
-            target = float(safe_sympify(_normalize_input_str(str(target_raw))))
-            if abs(val - target) <= question.tolerance:
-                return True, "✓ Correct!"
-            return (
-                False,
-                f"Numerical value is incorrect (got {val:.4f}). Try again or type 'hint'.",
-            )
-        except Exception as e:  # noqa: BLE001
-            return False, f"Could not parse numerical value: {e}"
-
-    if q_type == "integral":
-        try:
-            norm = _normalize_input_str(raw)
-            c_sym = sp.Symbol("C")
-            c_lower = sp.Symbol("c")
-            user_expr = safe_sympify(norm, locals_dict={"C": c_sym, "c": c_lower})
-            var = sp.Symbol(question.variable)
-
-            target_raw = (
-                question.correct_value
-                if question.correct_value is not None
-                else question.expected_answer
-            )
-            if isinstance(target_raw, str):
-                target_norm = re.sub(r"\s*\+\s*[cC]$", "", target_raw.strip())
-            else:
-                target_norm = str(target_raw)
-
-            if question.is_definite:
-                target = safe_sympify(target_norm)
-                if sp.simplify(user_expr - target) == 0:
-                    return True, "✓ Correct!"
-                try:
-                    if abs(float(user_expr) - float(target)) <= question.tolerance:
-                        return True, "✓ Correct!"
-                except (TypeError, ValueError):
-                    pass
-                return (
-                    False,
-                    "Calculated definite integral is incorrect. Try again or type 'hint'.",
-                )
-
-            # Indefinite integral: derivative of difference with respect to var must be 0
-            target_expr = safe_sympify(
-                target_norm, locals_dict={"C": c_sym, "c": c_lower}
-            )
-            diff_wrt_var = sp.diff(user_expr - target_expr, var)
-            if sp.simplify(diff_wrt_var) == 0:
-                return (
-                    True,
-                    "✓ Correct! (Antiderivative is equivalent up to an additive constant)",
-                )
-            return False, "Antiderivative does not match. Try again or type 'hint'."
-        except Exception as e:  # noqa: BLE001
-            return False, f"Syntax error in mathematical expression: {e}"
-
-    if q_type in ("derivative", "symbolic"):
-        try:
-            norm = _normalize_input_str(raw)
-            user_expr = safe_sympify(norm)
-            target_raw = (
-                question.correct_value
-                if question.correct_value is not None
-                else question.expected_answer
-            )
-            target = safe_sympify(str(target_raw))
-            if sp.simplify(user_expr - target) == 0:
-                return True, "✓ Correct!"
-            return False, "Expression does not match. Try again or type 'hint'."
-        except Exception as e:  # noqa: BLE001
-            return False, f"Syntax error in expression: {e}"
-
-    return False, "Unsupported question type."
+_randint_nonzero = randint_nonzero
+randit_nonzero = randint_nonzero
 
 
-def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQuestion:
+def _gen_derivative_question(
+    difficulty: str,
+    rng: random.Random,
+    exclude_subtypes: set[str] | list[str] | None = None,
+) -> PracticeQuestion:
     x = sp.Symbol("x")
     if difficulty == "easy":
-        choice = rng.choice(["poly", "trig"])
+        subtypes = ["poly", "trig", "exp", "log"]
+        choice = _select_subtype(rng, subtypes, exclude_subtypes)
         if choice == "poly":
             a = rng.randint(2, 6)
             n = rng.randint(2, 4)
@@ -228,8 +97,20 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
             ans = sp.diff(expr, x)
             prompt = f"Find the derivative f'(x) for f(x) = {expr}"
             hint = "Recall the power rule: d/dx[x^n] = n*x^(n-1) and sum rule."
+        elif choice == "exp":
+            a = randint_nonzero(rng, -5, 5)
+            expr = a * sp.exp(x)
+            ans = sp.diff(expr, x)
+            prompt = f"Find the derivative f'(x) for f(x) = {expr}"
+            hint = "Recall the exponential rule: d/dx[exp(x)] = exp(x)."
+        elif choice == "log":
+            a = randint_nonzero(rng, -5, 5)
+            expr = a * sp.log(x)
+            ans = sp.diff(expr, x)
+            prompt = f"Find the derivative f'(x) for f(x) = {expr}"
+            hint = "Recall the logarithmic rule: d/dx[ln(x)] = 1/x."
         else:
-            a = rng.randint(2, 5)
+            a = randint_nonzero(rng, -8, 8)
             fn = rng.choice([sp.sin, sp.cos])
             expr = a * fn(x)
             ans = sp.diff(expr, x)
@@ -239,7 +120,15 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
             )
 
     elif difficulty == "medium":
-        choice = rng.choice(["product", "chain_exp", "chain_trig"])
+        subtypes = [
+            "product",
+            "chain_exp",
+            "chain_trig",
+            "quotient",
+            "chain_power",
+            "chain_log",
+        ]
+        choice = _select_subtype(rng, subtypes, exclude_subtypes)
         if choice == "product":
             n = rng.choice([1, 2])
             fn = rng.choice([sp.sin, sp.exp])
@@ -248,21 +137,44 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
             prompt = f"Differentiate using the product rule: f(x) = {expr}"
             hint = "Recall the Product Rule: (u*v)' = u'*v + u*v'."
         elif choice == "chain_exp":
-            k = rng.choice([2, 3, 4])
-            expr = sp.exp(k * x)
+            k = randint_nonzero(rng, -5, 7)
+            a = randint_nonzero(rng, -3, 4)
+            expr = a * sp.exp(k * x)
             ans = sp.diff(expr, x)
             prompt = f"Find the derivative f'(x) for f(x) = {expr}"
             hint = "Recall the Chain Rule: d/dx[exp(k*x)] = k * exp(k*x)."
-        else:
-            k = rng.choice([2, 3, 4])
+        elif choice == "chain_trig":
+            k = randint_nonzero(rng, -5, 7)
             fn = rng.choice([sp.sin, sp.cos])
             expr = fn(k * x)
             ans = sp.diff(expr, x)
             prompt = f"Find the derivative f'(x) for f(x) = {expr}"
             hint = f"Recall the Chain Rule: d/dx[{fn.__name__}(k*x)] = {fn.__name__}'(k*x) * k."
+        elif choice == "quotient":
+            c = randint_nonzero(rng, 1, 5)
+            expr = x / (x + c)
+            ans = sp.diff(expr, x)
+            prompt = f"Differentiate using the quotient rule: f(x) = {expr}"
+            hint = "Recall the Quotient Rule: (u/v)' = (u'*v - u*v') / v^2."
+        elif choice == "chain_power":
+            a = randint_nonzero(rng, 2, 4)
+            b = randint_nonzero(rng, -3, 4)
+            n = rng.choice([3, 4])
+            expr = (a * x + b) ** n
+            ans = sp.diff(expr, x)
+            prompt = f"Find the derivative f'(x) for f(x) = {expr}"
+            hint = "Recall the Generalized Power Rule: d/dx[u^n] = n*u^(n-1) * u'."
+        else:  # chain_log
+            a = randint_nonzero(rng, 2, 4)
+            b = randint_nonzero(rng, 1, 5)
+            expr = sp.log(a * x + b)
+            ans = sp.diff(expr, x)
+            prompt = f"Differentiate the composite function: f(x) = {expr}"
+            hint = "Recall the Logarithmic Chain Rule: d/dx[ln(u)] = (1/u) * u'."
 
     else:  # hard
-        choice = rng.choice(["composite_log", "prod_trig_exp", "quotient"])
+        subtypes = ["composite_log", "prod_trig_exp", "quotient", "composite_exp_trig"]
+        choice = _select_subtype(rng, subtypes, exclude_subtypes)
         if choice == "composite_log":
             k = rng.randint(2, 4)
             expr = sp.log(k * x**2 + 1)
@@ -275,6 +187,11 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
             ans = sp.diff(expr, x)
             prompt = f"Differentiate using product and chain rules: f(x) = {expr}"
             hint = "Apply the Product Rule (u*v)' = u'*v + u*v' with u=exp(k*x) and v=sin(x)."
+        elif choice == "composite_exp_trig":
+            expr = sp.exp(sp.sin(x))
+            ans = sp.diff(expr, x)
+            prompt = f"Differentiate the composite function: f(x) = {expr}"
+            hint = "Apply the Chain Rule: d/dx[exp(u)] = exp(u) * u'."
         else:
             c = rng.randint(1, 4)
             expr = x / (x + c)
@@ -293,13 +210,18 @@ def _gen_derivative_question(difficulty: str, rng: random.Random) -> PracticeQue
         question_type="derivative",
         correct_value=ans,
         variable="x",
+        subtype=choice,
     )
 
-
-def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuestion:
+def _gen_integral_question(
+    difficulty: str,
+    rng: random.Random,
+    exclude_subtypes: set[str] | list[str] | None = None,
+) -> PracticeQuestion:
     x = sp.Symbol("x")
     if difficulty == "easy":
-        choice = rng.choice(["poly", "trig"])
+        subtypes = ["poly", "trig"]
+        choice = _select_subtype(rng, subtypes, exclude_subtypes)
         if choice == "poly":
             a = rng.randint(2, 5)
             n = rng.randint(1, 3)
@@ -327,10 +249,12 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
             correct_value=ans,
             variable="x",
             is_definite=False,
+            subtype=choice,
         )
 
     if difficulty == "medium":
-        choice = rng.choice(["u_sub", "exp", "reciprocal", "definite"])
+        subtypes = ["u_sub", "exp", "reciprocal", "definite"]
+        choice = _select_subtype(rng, subtypes, exclude_subtypes)
         if choice == "u_sub":
             k = rng.choice([2, 3, 4])
             fn = rng.choice([sp.sin, sp.cos])
@@ -350,13 +274,19 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
                 correct_value=ans,
                 variable="x",
                 is_definite=False,
+                subtype=choice,
             )
         if choice == "exp":
-            k = rng.choice([2, 3])
-            expr = sp.exp(k * x)
+            k = randint_nonzero(rng, -5, 5)
+            a = randint_nonzero(rng, -3, 4)
+            expr = a * sp.exp(k * x)
             ans = sp.integrate(expr, x)
-            prompt = f"Evaluate: ∫ {expr} dx"
-            hint = f"Recall: ∫ exp(k*x) dx = exp(k*x)/k + C with k = {k}."
+            prompt = f"Evaluate: ∫ ({expr}) dx"
+            hint = (
+                f"Recall: ∫ a*exp(k*x) dx = a*exp(k*x)/k + C."
+                if a != 1
+                else f"Recall: ∫ exp(k*x) dx = exp(k*x)/k + C with k = {k}."
+            )
             steps = get_integral_steps(str(expr), "x")
             return PracticeQuestion(
                 topic="integrals",
@@ -369,6 +299,7 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
                 correct_value=ans,
                 variable="x",
                 is_definite=False,
+                subtype=choice,
             )
         if choice == "reciprocal":
             a = rng.randint(2, 5)
@@ -388,6 +319,7 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
                 correct_value=ans,
                 variable="x",
                 is_definite=False,
+                subtype=choice,
             )
         # definite
         upper = rng.randint(1, 3)
@@ -407,10 +339,12 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
             correct_value=ans,
             variable="x",
             is_definite=True,
+            subtype=choice,
         )
 
     # hard
-    choice = rng.choice(["parts_exp", "parts_trig", "arctan_form"])
+    subtypes = ["parts_exp", "parts_trig", "arctan_form"]
+    choice = _select_subtype(rng, subtypes, exclude_subtypes)
     if choice == "parts_exp":
         expr = x * sp.exp(x)
         ans = sp.integrate(expr, x)
@@ -439,6 +373,7 @@ def _gen_integral_question(difficulty: str, rng: random.Random) -> PracticeQuest
         correct_value=ans,
         variable="x",
         is_definite=False,
+        subtype=choice,
     )
 
 
@@ -535,15 +470,16 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
     if difficulty == "easy":
         choice = rng.choice(["trace", "diag_det"])
         if choice == "trace":
-            a, b = rng.randint(1, 6), rng.randint(1, 6)
-            c, d = rng.randint(1, 6), rng.randint(1, 6)
+            a, b = rng.randint(-6, 6), rng.randint(-6, 6)
+            c, d = rng.randint(-6, 6), rng.randint(-6, 6)
             trace_val = a + d
             prompt = f"Calculate the trace of matrix A = [[{a}, {b}], [{c}, {d}]]"
             hint = "The trace is the sum of diagonal elements: trace(A) = a11 + a22."
+            d_str = f"({d})" if d < 0 else str(d)
             steps = [
                 f"Given matrix A = [[{a}, {b}], [{c}, {d}]]",
                 f"Identify diagonal entries: a11 = {a}, a22 = {d}",
-                f"Calculate trace: {a} + {d} = {trace_val}",
+                f"Calculate trace: {a} + {d_str} = {trace_val}",
             ]
             return PracticeQuestion(
                 topic="matrix",
@@ -555,14 +491,14 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
                 question_type="number",
                 correct_value=float(trace_val),
             )
-        a = rng.randint(2, 7)
-        d = rng.randint(2, 7)
+        a = randint_nonzero(rng, -7, 7)
+        d = randint_nonzero(rng, -7, 7)
         det_val = a * d
         prompt = f"Find the determinant of the diagonal matrix A = [[{a}, 0], [0, {d}]]"
         hint = "For a diagonal matrix, det is the product of diagonal elements: det = a11 * a22."
         steps = [
             f"Given diagonal matrix A = [[{a}, 0], [0, {d}]]",
-            f"Compute product of diagonal entries: {a} * {d} = {det_val}",
+            f"Compute product of diagonal entries: ({a}) * ({d}) = {det_val}",
         ]
         return PracticeQuestion(
             topic="matrix",
@@ -576,15 +512,16 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
         )
 
     if difficulty == "medium":
-        a, b = rng.randint(1, 5), rng.randint(1, 5)
-        c, d = rng.randint(1, 5), rng.randint(1, 5)
+        a, b = rng.randint(-5, 5), rng.randint(-5, 5)
+        c, d = rng.randint(-5, 5), rng.randint(-5, 5)
         det_val = a * d - b * c
         prompt = f"Find the determinant of matrix A = [[{a}, {b}], [{c}, {d}]]"
         hint = "Use formula det(A) = a*d - b*c."
+        bc_str = f"({b * c})" if b * c < 0 else str(b * c)
         steps = [
             f"Given 2x2 matrix A = [[{a}, {b}], [{c}, {d}]]",
             "Formula: det(A) = a*d - b*c",
-            f"Substitute values: ({a})*({d}) - ({b})*({c}) = {a * d} - {b * c} = {det_val}",
+            f"Substitute values: ({a})*({d}) - ({b})*({c}) = {a * d} - {bc_str} = {det_val}",
         ]
         return PracticeQuestion(
             topic="matrix",
@@ -600,16 +537,17 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
     # hard: 3x3 trace or upper triangular determinant
     choice = rng.choice(["3x3_trace", "triangular_det"])
     if choice == "3x3_trace":
-        d1, d2, d3 = rng.randint(1, 7), rng.randint(1, 7), rng.randint(1, 7)
+        d1, d2, d3 = rng.randint(-7, 7), rng.randint(-7, 7), rng.randint(-7, 7)
         trace_val = d1 + d2 + d3
         prompt = (
             f"Find the trace of matrix A = [[{d1}, 2, 3], [0, {d2}, 5], [1, 4, {d3}]]"
         )
         hint = "Sum the three main diagonal elements: a11 + a22 + a33."
+        diag_str = " + ".join(f"({d})" if d < 0 else str(d) for d in [d1, d2, d3])
         steps = [
             "Identify the main diagonal entries: a11, a22, a33",
             f"Entries: {d1}, {d2}, {d3}",
-            f"Trace = {d1} + {d2} + {d3} = {trace_val}",
+            f"Trace = {diag_str} = {trace_val}",
         ]
         return PracticeQuestion(
             topic="matrix",
@@ -621,14 +559,16 @@ def _gen_matrix_question(difficulty: str, rng: random.Random) -> PracticeQuestio
             question_type="number",
             correct_value=float(trace_val),
         )
-    d1, d2, d3 = rng.randint(2, 5), rng.randint(2, 5), rng.randint(2, 5)
+    d1 = randint_nonzero(rng, -8, 8)
+    d2 = randint_nonzero(rng, -8, 8)
+    d3 = randint_nonzero(rng, -8, 8)
     det_val = d1 * d2 * d3
     prompt = f"Find the determinant of upper-triangular matrix A = [[{d1}, 3, 1], [0, {d2}, 4], [0, 0, {d3}]]"
     hint = "For any triangular matrix, determinant equals the product of its diagonal entries."
     steps = [
         "Matrix is upper triangular (all entries below diagonal are 0)",
         "Property: det(A) = product of diagonal entries",
-        f"Calculate: {d1} * {d2} * {d3} = {det_val}",
+        f"Calculate: ({d1}) * ({d2}) * ({d3}) = {det_val}",
     ]
     return PracticeQuestion(
         topic="matrix",
@@ -762,6 +702,7 @@ def generate_question(
     difficulty: str = "medium",
     seed: int | None = None,
     rng: random.Random | None = None,
+    exclude_subtypes: set[str] | list[str] | None = None,
 ) -> PracticeQuestion:
     """Generates a randomized practice problem according to requested topic and difficulty."""
     if rng is None:
@@ -776,9 +717,13 @@ def generate_question(
         chosen_diff = rng.choice(["easy", "medium", "hard"])
 
     if canonical_topic == "derivatives":
-        return _gen_derivative_question(chosen_diff, rng)
+        return _gen_derivative_question(
+            chosen_diff, rng, exclude_subtypes=exclude_subtypes
+        )
     if canonical_topic == "integrals":
-        return _gen_integral_question(chosen_diff, rng)
+        return _gen_integral_question(
+            chosen_diff, rng, exclude_subtypes=exclude_subtypes
+        )
     if canonical_topic == "algebra":
         return _gen_algebra_question(chosen_diff, rng)
     if canonical_topic == "matrix":
@@ -786,159 +731,4 @@ def generate_question(
     if canonical_topic == "stats":
         return _gen_stats_question(chosen_diff, rng)
 
-    return _gen_derivative_question(chosen_diff, rng)
-
-
-def format_question_card(q: PracticeQuestion, index: int | None = None) -> str:
-    """Formats a single practice question with hints, answers, and steps for non-interactive output."""
-    prefix = f"Question #{index}: " if index is not None else ""
-    lines = [
-        f"[{q.topic.upper()}] (Difficulty: {q.difficulty})",
-        f"{prefix}{q.prompt}",
-        f"Hint: {q.hint}",
-        f"Expected Answer: {q.expected_answer}",
-        "Step-by-step solution:",
-    ]
-    for idx, s in enumerate(q.steps, 1):
-        lines.append(f"  {idx}. {s}")
-    return "\n".join(lines)
-
-
-class PracticeSession:
-    """Interactive CLI practice quizzer with score tracking, hints, and derivations."""
-
-    def __init__(
-        self,
-        topic: str = "all",
-        count: int = 5,
-        difficulty: str = "medium",
-        seed: int | None = None,
-        input_func: Callable[[str], str] | None = None,
-        print_func: Callable[..., None] | None = None,
-    ):
-        self.topic = topic
-        self.count = max(1, count)
-        self.difficulty = difficulty
-        self.rng = random.Random(seed)
-        self.input_func = input_func if input_func is not None else input
-        self.print_func = print_func if print_func is not None else print
-
-    def run(self) -> dict[str, Any]:
-        """Runs the interactive practice session."""
-        self.print_func("=" * 60)
-        self.print_func("  MathStore University Practice & Revision Quizzer")
-        self.print_func(
-            f"  Topic: {self.topic.capitalize()} | Difficulty: {self.difficulty.capitalize()} | Questions: {self.count}"
-        )
-        self.print_func(
-            "  Commands: 'hint' for a hint, 'skip' to reveal solution, 'quit' to exit."
-        )
-        self.print_func("=" * 60)
-
-        score = 0
-        skipped = 0
-        completed = 0
-
-        for i in range(1, self.count + 1):
-            q = generate_question(
-                topic=self.topic,
-                difficulty=self.difficulty,
-                rng=self.rng,
-            )
-
-            self.print_func(
-                f"\n[Question {i}/{self.count}] ({q.topic.capitalize()} - {q.difficulty})"
-            )
-            self.print_func(f"  {q.prompt}")
-
-            attempts = 0
-            while True:
-                try:
-                    user_resp = self.input_func("  Your answer > ").strip()
-                except (EOFError, KeyboardInterrupt):
-                    self.print_func("\nSession ended by user.")
-                    return {
-                        "total": self.count,
-                        "completed": completed,
-                        "correct": score,
-                        "skipped": skipped,
-                        "percentage": (score / max(1, completed)) * 100
-                        if completed
-                        else 0.0,
-                    }
-
-                if user_resp.lower() == "quit":
-                    self.print_func("\nExiting practice session early...")
-                    self._show_summary(score, completed, skipped)
-                    return {
-                        "total": self.count,
-                        "completed": completed,
-                        "correct": score,
-                        "skipped": skipped,
-                        "percentage": (score / max(1, completed)) * 100
-                        if completed
-                        else 0.0,
-                    }
-
-                if user_resp.lower() == "hint":
-                    self.print_func(f"  💡 Hint: {q.hint}")
-                    continue
-
-                if user_resp.lower() == "skip":
-                    self.print_func(
-                        f"  ⏭ Skipped. Expected answer: {q.expected_answer}"
-                    )
-                    self.print_func("  Step-by-step solution:")
-                    for idx, s in enumerate(q.steps, 1):
-                        self.print_func(f"    {idx}. {s}")
-                    skipped += 1
-                    completed += 1
-                    break
-
-                is_correct, feedback = check_answer(user_resp, q)
-                if is_correct:
-                    self.print_func(f"  {feedback}")
-                    score += 1
-                    completed += 1
-                    break
-
-                attempts += 1
-                self.print_func(f"  ✗ {feedback}")
-                if attempts >= 2:
-                    self.print_func(f"  The correct answer was: {q.expected_answer}")
-                    self.print_func("  Step-by-step solution:")
-                    for idx, s in enumerate(q.steps, 1):
-                        self.print_func(f"    {idx}. {s}")
-                    completed += 1
-                    break
-
-        self._show_summary(score, completed, skipped)
-        pct = (score / max(1, completed)) * 100 if completed else 0.0
-        return {
-            "total": self.count,
-            "completed": completed,
-            "correct": score,
-            "skipped": skipped,
-            "percentage": pct,
-        }
-
-    def _show_summary(self, score: int, completed: int, skipped: int) -> None:
-        self.print_func("\n" + "=" * 60)
-        self.print_func("  Practice Quiz Completed!")
-        pct = (score / max(1, completed)) * 100 if completed else 0.0
-        self.print_func(f"  Questions Attempted: {completed}/{self.count}")
-        self.print_func(f"  Correct Answers:     {score}")
-        self.print_func(f"  Skipped:             {skipped}")
-        self.print_func(f"  Score:               {pct:.1f}%")
-
-        if pct >= 80.0:
-            self.print_func("  🌟 Outstanding! You have mastered these concepts.")
-        elif pct >= 60.0:
-            self.print_func(
-                "  👍 Good effort! Review the tricky derivations and try again."
-            )
-        else:
-            self.print_func(
-                "  📚 Keep revising! Use 'mathstore ref' to consult cheat sheets."
-            )
-        self.print_func("=" * 60)
+    return _gen_derivative_question(chosen_diff, rng, exclude_subtypes=exclude_subtypes)
