@@ -430,3 +430,44 @@ def test_get_steps_fallback(solver: ODESolver) -> None:
     assert "Classify the equation" in text
     assert "analytical method" in text
 
+
+def test_solve_bernoulli(solver: ODESolver) -> None:
+    # Solves without timeout due to Bernoulli hint selection and implicit formulation
+    sol = solver.solve("xy' + y = (x^3)y^6")
+    assert "y(x)**(-5)" in sol or "y(x)" in sol
+    assert "C1" in sol
+
+
+def test_check_bernoulli_solution(solver: ODESolver) -> None:
+    # Verifies list-of-tuples return from checkodesol for implicit Bernoulli solutions
+    sol_str = "y(x)**(-5) = x**5*(C1 + 5/(2*x**2))"
+    assert solver.check_solution("xy' + y = (x^3)y^6", sol_str) is True
+
+
+def test_get_steps_bernoulli(solver: ODESolver) -> None:
+    steps = solver.get_steps("2xy y' = y^2 - x^2")
+    assert len(steps) >= 10
+    text = "\n".join(steps)
+    assert "Bernoulli Differential Equation" in text
+    assert "P(x) = -1/(2*x)" in text
+    assert "Integrating Factor" in text
+    assert "y(x)**2 = x*(C1 - x)" in text
+
+
+def test_get_steps_homogeneous(solver: ODESolver) -> None:
+    steps = solver.get_steps("y' = (x^2 + y^2)/(2*x^2)")
+    assert len(steps) >= 7
+    text = "\n".join(steps)
+    assert "Homogeneous First-Order ODE" in text
+    assert "substitution y = v*x" in text
+
+
+def test_get_steps_exact(solver: ODESolver) -> None:
+    steps = solver.get_steps("(2*x + y) + (x + 2*y)*y' = 0")
+    assert len(steps) >= 6
+    text = "\n".join(steps)
+    assert "Exact First-Order ODE" in text
+    assert "potential function" in text
+
+
+

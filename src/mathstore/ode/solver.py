@@ -496,6 +496,18 @@ class ODESolver:
             kwargs["ics"] = parsed_ics
         if hint != "default":
             kwargs["hint"] = hint
+        else:
+            # If default hint is requested, select the most efficient specialized hint
+            # when sympy's generic heuristic might pick an exponentially slow path
+            try:
+                available_hints = list(classify_ode(eq, f_app))
+                if "Bernoulli" in available_hints and available_hints[0] == "factorable":
+                    kwargs["hint"] = "Bernoulli"
+                    # For higher power Bernoulli equations, avoiding full root expansion
+                    # prevents combinatorial explosion while yielding a clean implicit form
+                    kwargs["simplify"] = False
+            except Exception:
+                pass
 
         # Isolate the CAS execution to prevent infinite hangs
         try:
@@ -576,8 +588,15 @@ class ODESolver:
             raise ValueError(f"Unsupported solution type: {type(solution).__name__}")
 
         try:
-            is_valid, _ = checkodesol(eq, sol_eq)
-            return bool(is_valid)
+            res = checkodesol(eq, sol_eq)
+            if isinstance(res, tuple):
+                return bool(res[0])
+            if isinstance(res, list):
+                return all(
+                    bool(item[0]) if isinstance(item, tuple) else bool(item)
+                    for item in res
+                )
+            return bool(res)
         except Exception:
             return False
 
@@ -623,7 +642,7 @@ class ODESolver:
     ) -> list[str]:
         """
         Generates step-by-step pedagogical explanations for solving an ODE.
-        Supports Separable and First-Order Linear (Integrating Factor) equations.
+        Supports Separable, First-Order Linear, Bernoulli, Homogeneous, and Exact equations.
         """
         eq = self.parse_equation(equation, var=var, func=func)
         var_sym = self._get_symbol(var)
@@ -773,6 +792,331 @@ class ODESolver:
             )
             steps.append(
                 f"5. Integrate both sides with respect to {var} and solve for {func}."
+            )
+            return steps
+
+        # 3. Bernoulli Differential Equation
+        if "Bernoulli" in hints:
+            steps.append("1. Classify the equation: Bernoulli Differential Equation.")
+            try:
+                isolated = sp.solve(eq, deriv)
+                if isolated:
+                    rhs = isolated[0]
+                    rhs_sub = rhs.subs(f_app, y_sym)
+
+                    # Extract P(x), Q(x), and n such that y' + P(x)*y = Q(x)*y^n
+                    # i.e., rhs = -P(x)*y + Q(x)*y^n
+                    rhs_expanded = sp.expand(rhs_sub)
+                    poly_terms = sp.Add.make_args(rhs_expanded)
+                    powers = {}
+                    extract_failed = False
+                    for term in poly_terms:
+                        term_coeff, term_rest = term.as_independent(
+                            y_sym, as_Add=False
+                        )
+                        if term_rest == y_sym:
+                            p = sp.Integer(1)
+                            c = term_coeff
+                        elif term_rest.is_Pow and term_rest.base == y_sym:
+                            p = term_rest.exp
+                            c = term_coeff
+                        elif term_rest == 1:
+                            p = sp.Integer(0)
+                            c = term_coeff
+                        else:
+                            extract_failed = True
+                            break
+                        powers[p] = powers.get(p, sp.Integer(0)) + c
+
+                    if not extract_failed and len(powers) in (1, 2):
+                        if sp.Integer(1) in powers and len(powers) == 2:
+                            other_p = [p for p in powers if p != 1][0]
+                            if other_p not in (0, 1):
+                                P_x = (-powers[sp.Integer(1)]).simplify()
+                                Q_x = powers[other_p].simplify()
+                                n = other_p
+                            else:
+                                extract_failed = True
+                        elif sp.Integer(1) not in powers and len(powers) == 1:
+                            other_p = list(powers.keys())[0]
+                            if other_p not in (0, 1):
+                                P_x = sp.Integer(0)
+                                Q_x = powers[other_p].simplify()
+                                n = other_p
+                            else:
+                                extract_failed = True
+                        else:
+                            extract_failed = True
+                    else:
+                        extract_failed = True
+
+                    if not extract_failed:
+                        steps.append(
+                            f"2. Rewrite the equation in standard Bernoulli form: {func}' + P({var})*{func} = Q({var})*{func}^n:"
+                        )
+                        steps.append(
+                            f"   {func}' + ({P_x})*{func} = ({Q_x})*{func}^{n}"
+                        )
+                        steps.append(
+                            f"   Here, P({var}) = {P_x}, Q({var}) = {Q_x}, and n = {n}."
+                        )
+
+                        k = 1 - n
+                        steps.append(
+                            f"3. Divide the equation by {func}^{n} (or multiply by {func}^({-n})):"
+                        )
+                        steps.append(
+                            f"   {func}^({-n})*{func}' + ({P_x})*{func}^{{{k}}} = {Q_x}"
+                        )
+
+                        steps.append(
+                            f"4. Introduce the substitution v = {func}^(1-n) = {func}^{{{k}}}."
+                        )
+                        steps.append(
+                            f"   Differentiating with respect to {var} yields: v' = ({k})*{func}^({-n})*{func}',"
+                        )
+                        steps.append(
+                            f"   which implies {func}^({-n})*{func}' = (1/({k}))*v'."
+                        )
+
+                        P_lin = (k * P_x).simplify()
+                        Q_lin = (k * Q_x).simplify()
+                        steps.append(
+                            f"5. Substitute v and v' to obtain a first-order linear differential equation in v({var}):"
+                        )
+                        steps.append(f"   v' + ({P_lin})*v = {Q_lin}")
+
+                        int_P_lin = sp.integrate(P_lin, var_sym)
+                        IF = sp.simplify(sp.exp(int_P_lin))
+                        steps.append(
+                            f"6. Find the Integrating Factor (IF) for the linear ODE:"
+                        )
+                        steps.append(
+                            f"   IF = exp( ∫ ({P_lin}) d{var} ) = exp({int_P_lin}) = {IF}"
+                        )
+
+                        steps.append(
+                            f"7. Multiply the linear equation by the Integrating Factor {IF}:"
+                        )
+                        steps.append(
+                            f"   d/d{var}[ v * ({IF}) ] = ({IF}) * ({Q_lin})"
+                        )
+
+                        int_IF_Q = sp.integrate((IF * Q_lin).simplify(), var_sym)
+                        steps.append(
+                            f"8. Integrate both sides with respect to {var}:"
+                        )
+                        steps.append(
+                            f"   v * ({IF}) = ∫ ({sp.simplify(IF * Q_lin)}) d{var} + C"
+                        )
+                        steps.append(f"   v * ({IF}) = {int_IF_Q} + C")
+
+                        v_sol = ((int_IF_Q + sp.Symbol("C1")) / IF).simplify()
+                        steps.append(f"9. Solve for v({var}):")
+                        steps.append(f"   v({var}) = {v_sol}")
+
+                        steps.append(
+                            f"10. Substitute back v = {func}^{{{k}}} to obtain the implicit solution:"
+                        )
+                        steps.append(f"    {func}({var})^{{{k}}} = {v_sol}")
+
+                        try:
+                            sol = self.solve(eq, var=var, func=func)
+                            sol_str = (
+                                ", ".join(str(s) for s in sol)
+                                if isinstance(sol, list)
+                                else str(sol)
+                            )
+                            steps.append("11. Final solution:")
+                            steps.append(f"    {sol_str}")
+                        except Exception:
+                            pass
+                        return steps
+            except Exception:
+                pass
+
+            # Fallback for Bernoulli
+            steps.append(
+                f"2. Ensure the equation is in standard Bernoulli form: {func}' + P({var}){func} = Q({var}){func}^n."
+            )
+            steps.append(
+                f"3. Divide by {func}^n and introduce the substitution v = {func}^(1-n) to linearize the equation."
+            )
+            steps.append(
+                f"4. Solve the resulting first-order linear ODE v' + (1-n)P({var})v = (1-n)Q({var}) using an integrating factor."
+            )
+            steps.append(
+                f"5. Substitute back v = {func}^(1-n) to obtain the solution for {func}({var})."
+            )
+            return steps
+
+        # 4. Exact First-Order ODE
+        if "1st_exact" in hints or "exact" in hints:
+            steps.append("1. Classify the equation: Exact First-Order ODE.")
+            try:
+                diff_expr = (eq.lhs - eq.rhs).expand()
+                N_y = sp.diff(diff_expr, deriv).subs(f_app, y_sym).simplify()
+                M_x = (diff_expr - N_y * deriv).subs(f_app, y_sym).simplify()
+
+                dM_dy = sp.diff(M_x, y_sym).simplify()
+                dN_dx = sp.diff(N_y, var_sym).simplify()
+
+                if dM_dy == dN_dx and N_y != 0:
+                    steps.append(
+                        f"2. Write in differential form M({var}, {func}) d{var} + N({var}, {func}) d{func} = 0:"
+                    )
+                    steps.append(f"   ({M_x}) d{var} + ({N_y}) d{func} = 0")
+                    steps.append(
+                        f"3. Verify exactness: ∂M/∂{func} = ∂N/∂{var}:"
+                    )
+                    steps.append(f"   ∂M/∂{func} = {dM_dy}")
+                    steps.append(f"   ∂N/∂{var} = {dN_dx}")
+                    steps.append(
+                        "   Since ∂M/∂y = ∂N/∂x, the differential equation is exact."
+                    )
+
+                    psi_x = sp.integrate(M_x, var_sym)
+                    steps.append(
+                        f"4. Integrate M({var}, {func}) with respect to {var} to find the potential function Ψ({var}, {func}):"
+                    )
+                    steps.append(
+                        f"   Ψ({var}, {func}) = ∫ ({M_x}) d{var} + g({func}) = {psi_x} + g({func})"
+                    )
+
+                    d_psi_dy = sp.diff(psi_x, y_sym)
+                    g_prime = (N_y - d_psi_dy).simplify()
+                    g_y = sp.integrate(g_prime, y_sym)
+
+                    steps.append(
+                        f"5. Differentiate Ψ with respect to {func} and equate to N({var}, {func}) to determine g({func}):"
+                    )
+                    steps.append(f"   ∂Ψ/∂{func} = {d_psi_dy} + g'({func}) = {N_y}")
+                    steps.append(f"   g'({func}) = {g_prime}  ⟹  g({func}) = {g_y}")
+
+                    psi_total = (psi_x + g_y).simplify()
+                    steps.append(
+                        "6. The general solution is given implicitly by Ψ(x, y) = C:"
+                    )
+                    steps.append(f"   {psi_total} = C")
+
+                    try:
+                        sol = self.solve(eq, var=var, func=func)
+                        sol_str = (
+                            ", ".join(str(s) for s in sol)
+                            if isinstance(sol, list)
+                            else str(sol)
+                        )
+                        steps.append(
+                            f"7. Solve for {func}({var}) explicitly if possible:"
+                        )
+                        steps.append(f"   {sol_str}")
+                    except Exception:
+                        pass
+                    return steps
+            except Exception:
+                pass
+
+            # Fallback for Exact ODE
+            steps.append(
+                f"2. Write in differential form M({var}, {func}) d{var} + N({var}, {func}) d{func} = 0."
+            )
+            steps.append(
+                f"3. Verify exactness condition: ∂M/∂{func} = ∂N/∂{var}."
+            )
+            steps.append(
+                f"4. Find the potential function Ψ({var}, {func}) = ∫ M d{var} + g({func})."
+            )
+            steps.append(
+                f"5. Differentiate Ψ with respect to {func} to find g({func}) from N."
+            )
+            steps.append("6. Set Ψ(x, y) = C to obtain the implicit solution.")
+            return steps
+
+        # 5. Homogeneous First-Order ODE
+        if any("homogeneous_coeff" in h for h in hints):
+            steps.append("1. Classify the equation: Homogeneous First-Order ODE.")
+            try:
+                isolated = sp.solve(eq, deriv)
+                if isolated:
+                    rhs = isolated[0]
+                    rhs_sub = rhs.subs(f_app, y_sym)
+                    v_sym = sp.Symbol("v")
+
+                    steps.append(
+                        f"2. Express the derivative {func}' explicitly in terms of {var} and {func}:"
+                    )
+                    steps.append(f"   {func}' = {rhs_sub}")
+
+                    rhs_v = sp.simplify(rhs_sub.subs(y_sym, v_sym * var_sym))
+                    # If var_sym is eliminated, it is degree 0 homogeneous
+                    if var_sym not in rhs_v.free_symbols:
+                        steps.append(
+                            f"3. Introduce the substitution {func} = v*{var}, which implies by the product rule:"
+                        )
+                        steps.append(f"   {func}' = v + {var}*(dv/d{var})")
+                        steps.append(
+                            f"4. Substitute {func} = v*{var} into the equation to express the right-hand side in terms of v only:"
+                        )
+                        steps.append(f"   v + {var}*(dv/d{var}) = {rhs_v}")
+
+                        diff_v = sp.simplify(rhs_v - v_sym)
+                        inv_diff_v = sp.simplify(1 / diff_v)
+
+                        steps.append(
+                            f"5. Rearrange to separate the variables v and {var}:"
+                        )
+                        steps.append(f"   {var}*(dv/d{var}) = {diff_v}")
+                        steps.append(f"   ({inv_diff_v}) dv = (1/{var}) d{var}")
+
+                        int_v = sp.integrate(inv_diff_v, v_sym)
+                        int_var = sp.integrate(1 / var_sym, var_sym)
+
+                        steps.append(
+                            "6. Integrate both sides with respect to their variables:"
+                        )
+                        steps.append(
+                            f"   ∫ ({inv_diff_v}) dv = ∫ (1/{var}) d{var} + C"
+                        )
+                        steps.append(f"   {int_v} = {int_var} + C")
+
+                        implicit_sol = int_v.subs(v_sym, y_sym / var_sym)
+                        steps.append(
+                            f"7. Substitute back v = {func}/{var} to obtain the implicit solution:"
+                        )
+                        steps.append(f"   {implicit_sol} = {int_var} + C")
+
+                        try:
+                            sol = self.solve(eq, var=var, func=func)
+                            sol_str = (
+                                ", ".join(str(s) for s in sol)
+                                if isinstance(sol, list)
+                                else str(sol)
+                            )
+                            steps.append(
+                                f"8. Solve for {func}({var}) explicitly if possible:"
+                            )
+                            steps.append(f"   {sol_str}")
+                        except Exception:
+                            pass
+                        return steps
+            except Exception:
+                pass
+
+            # Fallback for Homogeneous
+            steps.append(
+                f"2. Rewrite the equation in derivative form: {func}' = F({var}, {func})."
+            )
+            steps.append(
+                f"3. Introduce the substitution v = {func}/{var} ({func} = v*{var}), giving {func}' = v + {var}*(dv/d{var})."
+            )
+            steps.append(
+                f"4. Substitute into the equation to obtain the separable form: {var}*(dv/d{var}) = F(1, v) - v."
+            )
+            steps.append(
+                f"5. Separate variables: (1 / (F(1, v) - v)) dv = (1/{var}) d{var}."
+            )
+            steps.append(
+                f"6. Integrate both sides and substitute back v = {func}/{var} to obtain the solution."
             )
             return steps
 
