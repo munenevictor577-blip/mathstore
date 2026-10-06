@@ -11,6 +11,7 @@ from mathstore.study.steps import (
     get_derivative_steps,
     get_equation_steps,
     get_integral_steps,
+    get_ode_steps,
 )
 
 
@@ -279,3 +280,50 @@ class TestEquationSteps:
     def test_quadratic_steps_symbolic_coefficients(self):
         steps = get_equation_steps("a*x**2 + b*x + c = 0", variable="x")
         assert any("quadratic formula" in s.lower() for s in steps)
+
+
+class TestODESteps:
+    """Tests for ODE step-by-step breakdown."""
+
+    def test_ode_steps_separable(self):
+        steps = get_ode_steps("y' = x*y", variable="x", function="y")
+        assert len(steps) >= 5
+        text = "\n".join(steps)
+        assert "Separable First-Order ODE" in text
+        assert "Integrate both sides" in text
+
+    def test_ode_steps_linear(self):
+        steps = get_ode_steps("y' + 2*y = exp(x)", variable="x", function="y")
+        assert len(steps) >= 6
+        text = "\n".join(steps)
+        assert "First-Order Linear ODE" in text
+        assert "Integrating Factor" in text
+
+    def test_ode_steps_bernoulli(self):
+        steps = get_ode_steps("2xy y' = y^2 - x^2", variable="x", function="y")
+        assert len(steps) >= 8
+        text = "\n".join(steps)
+        assert "Bernoulli Differential Equation" in text
+        assert "substitution v" in text or "Integrating Factor" in text
+        assert "y(x)**2 = x*(C1 - x)" in text or "C1" in text
+
+        # Higher power Bernoulli
+        steps2 = get_ode_steps("xy' + y = (x^3)y^6", variable="x", function="y")
+        assert len(steps2) >= 8
+        text2 = "\n".join(steps2)
+        assert "Bernoulli Differential Equation" in text2
+        assert "v = y^(1-n)" in text2 or "v = y^{-5}" in text2
+
+    def test_ode_steps_homogeneous(self):
+        steps = get_ode_steps("y' = (x^2 + y^2)/(2*x^2)", variable="x", function="y")
+        assert len(steps) >= 6
+        text = "\n".join(steps)
+        assert "Homogeneous First-Order ODE" in text
+        assert "v = y/x" in text or "substitution" in text.lower()
+
+    def test_ode_steps_exact(self):
+        steps = get_ode_steps("(2*x + y) + (x + 2*y)*y' = 0", variable="x", function="y")
+        assert len(steps) >= 6
+        text = "\n".join(steps)
+        assert "Exact First-Order ODE" in text
+        assert "potential function" in text.lower() or "exact" in text.lower()

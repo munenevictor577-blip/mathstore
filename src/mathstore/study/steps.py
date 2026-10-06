@@ -405,3 +405,17 @@ def get_equation_steps(equation_str: str, variable: str = "x") -> list[str]:
     steps.append(f"Isolate {variable} using algebraic methods: {diff_expr} = 0")
     steps.append(f"Solutions: {variable} = {sols}")
     return steps
+
+
+def get_ode_steps(
+    equation: str,
+    variable: str = "x",
+    function: str = "y",
+) -> list[str]:
+    """Generates pedagogical step-by-step explanations for solving an ordinary differential equation."""
+    from mathstore.ode.solver import ODESolver
+
+    return ODESolver(default_var=variable, default_func=function).get_steps(
+        equation, var=variable, func=function
+    )
+
