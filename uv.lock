@@ -307,7 +307,7 @@ wheels = [
 
 [[package]]
 name = "mathstore"
-version = "0.1.1a2"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },

@@ -5,6 +5,7 @@ import sys
 from mathstore.algebra.solver import EquationSolver
 from mathstore.calculus.analyzer import CalculusAnalyzer
 from mathstore.core.matrix import MatrixAnalyzer
+from mathstore.ode.solver import ODESolver
 from mathstore.reference import get_reference, list_topics_formatted
 from mathstore.statistics.analyzer import StatsAnalyzer
 
@@ -241,7 +242,7 @@ def main():
         type=str,
         nargs="?",
         default="all",
-        help="Practice topic (derivatives, integrals, algebra, matrix, stats, or all)",
+        help="Practice topic (derivatives, integrals, algebra, matrix, stats, ode, or all)",
     )
     practice_p.add_argument(
         "--topic",
@@ -276,6 +277,61 @@ def main():
         type=int,
         default=None,
         help="Random seed for reproducible question generation",
+    )
+
+    ode_p = subparsers.add_parser(
+        "ode", help="Solve, classify, or verify ordinary differential equations"
+    )
+    ode_p.add_argument(
+        "equation",
+        type=str,
+        help='Differential equation (e.g. "y\' + 2*y = exp(x)" or "y\'\' + 4*y = 0")',
+    )
+    ode_p.add_argument(
+        "--ics",
+        type=str,
+        default=None,
+        help='Initial conditions (e.g. "y(0)=1, y\'(0)=2")',
+    )
+    ode_p.add_argument(
+        "--var",
+        type=str,
+        default="x",
+        help="Independent variable (default: x)",
+    )
+    ode_p.add_argument(
+        "--func",
+        type=str,
+        default="y",
+        help="Dependent variable / function name (default: y)",
+    )
+    ode_p.add_argument(
+        "--classify",
+        action="store_true",
+        help="Classify the ODE instead of solving",
+    )
+    ode_p.add_argument(
+        "--check",
+        type=str,
+        default=None,
+        help="Verify if candidate solution satisfies the ODE",
+    )
+    ode_p.add_argument(
+        "--hint",
+        type=str,
+        default="default",
+        help="Optional SymPy solving hint (default: default)",
+    )
+    ode_p.add_argument(
+        "--steps",
+        action="store_true",
+        help="Output step-by-step pedagogical solution explanation",
+    )
+    ode_p.add_argument(
+        "--latex", action="store_true", help="Output solution in LaTeX format"
+    )
+    ode_p.add_argument(
+        "--pretty", action="store_true", help="Output solution in pretty Unicode format"
     )
 
     args = parser.parse_args()
@@ -429,10 +485,27 @@ def main():
                 )
 
                 rng = random.Random(args.seed) if args.seed is not None else None
+                seen_prompts: set[str] = set()
+                used_subtypes: set[str] = set()
                 for i in range(1, count + 1):
                     q = generate_question(
-                        topic=topic, difficulty=args.difficulty, rng=rng
+                        topic=topic,
+                        difficulty=args.difficulty,
+                        rng=rng,
+                        exclude_subtypes=used_subtypes,
                     )
+                    retry_count = 0
+                    while q.prompt in seen_prompts and retry_count < 30:
+                        q = generate_question(
+                            topic=topic,
+                            difficulty=args.difficulty,
+                            rng=rng,
+                            exclude_subtypes=used_subtypes,
+                        )
+                        retry_count += 1
+                    seen_prompts.add(q.prompt)
+                    if q.subtype:
+                        used_subtypes.add(q.subtype)
                     card = format_question_card(q, index=i if count > 1 else None)
                     print(card)
                     if i < count:
@@ -448,6 +521,49 @@ def main():
                     seed=args.seed,
                 )
                 session.run()
+
+        elif args.command == "ode":
+            ode_solver = ODESolver(default_var=args.var, default_func=args.func)
+            if args.check:
+                is_valid = ode_solver.check_solution(
+                    args.equation, args.check, var=args.var, func=args.func
+                )
+                if is_valid:
+                    print(
+                        f"Verified: '{args.check}' is a valid solution to '{args.equation}'."
+                    )
+                else:
+                    print(
+                        f"Verification failed: '{args.check}' does not satisfy '{args.equation}'."
+                    )
+            elif args.classify:
+                info = ode_solver.classify(args.equation, var=args.var, func=args.func)
+                print(f"ODE Classification for '{args.equation}':")
+                print(f"  Order:        {info['order']}")
+                print(f"  Linear:       {info['is_linear']}")
+                print(f"  Homogeneous:  {info['is_homogeneous']}")
+                print(f"  Primary Type: {info['primary_type']}")
+                if info["hints"]:
+                    print(f"  Solver Hints: {', '.join(info['hints'][:5])}")
+            elif getattr(args, "steps", False):
+                steps = ode_solver.get_steps(
+                    args.equation, var=args.var, func=args.func
+                )
+                for step in steps:
+                    print(step)
+            else:
+                sol = ode_solver.solve(
+                    args.equation,
+                    ics=args.ics,
+                    var=args.var,
+                    func=args.func,
+                    hint=args.hint,
+                    format=fmt,
+                )
+                if fmt == "str":
+                    print(f"Solution: {sol}")
+                else:
+                    print(sol)
 
     except Exception as e:  # noqa: BLE001
         print(f"Error executing '{args.command}' : {e}", file=sys.stderr)

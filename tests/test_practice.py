@@ -1,6 +1,7 @@
 import random
 from unittest.mock import patch
 
+import pytest
 import sympy as sp
 
 from mathstore.study.practice import (
@@ -12,6 +13,7 @@ from mathstore.study.practice import (
     _gen_derivative_question,
     _gen_integral_question,
     _gen_matrix_question,
+    _gen_ode_question,
     _gen_stats_question,
     check_answer,
     format_question_card,
@@ -31,7 +33,7 @@ class TestPracticeQuestionGeneration:
             assert q_der_trig.topic == "derivatives"
 
         # Derivatives: medium chain_exp (lines 222-226)
-        with patch.object(rng, "choice", side_effect=["chain_exp", 3]):
+        with patch.object(rng, "choice", side_effect=["chain_exp", 3, 2]):
             q_der_exp = _gen_derivative_question("medium", rng)
             assert "exp" in q_der_exp.prompt
 
@@ -503,9 +505,10 @@ class TestPracticeFormattingAndSession:
         assert "Step-by-step solution:" in card
 
     def test_practice_session_all_correct(self):
-        # Mock inputs: answer matching seed 42 ("2*cos(2*x)")
-        answers = iter(["2*cos(2*x)"])
         outputs = []
+        gen_rng = random.Random(42)
+        q = generate_question(topic="derivatives", difficulty="medium", rng=gen_rng)
+        answers = iter([str(q.expected_answer)])
 
         session = PracticeSession(
             topic="derivatives",
@@ -585,3 +588,325 @@ class TestPracticeFormattingAndSession:
         session = PracticeSession(count=5, print_func=printed.append)
         session._show_summary(score=3, completed=5, skipped=2)
         assert any("Good effort" in str(line) for line in printed)
+
+    def test_derivatives_unique_questions_with_seed(self):
+        """Verify that 5 questions generated with seed 42 are unique deterministically."""
+        my_rng = random.Random(42)
+        questions = [generate_question(topic="derivatives", rng=my_rng) for _ in range(5)]
+        prompts = [q.prompt for q in questions]
+        assert len(set(prompts)) == 5
+
+    def test_matrix_negative_entries(self):
+        """Verify that matrix questions can have negative entries."""
+        rng = random.Random(42)
+        negative_found = False
+        for diff in ["easy", "medium", "hard"]:
+            for _ in range(20):
+                q = generate_question(topic="matrix", difficulty=diff, rng=rng)
+                if "-" in q.prompt:
+                    negative_found = True
+                    break
+        assert negative_found
+
+    def test_practice_session_no_duplicate_prompts(self):
+        """Verify that questions do not repeat in a session."""
+        outputs = []
+        session = PracticeSession(
+            topic="derivatives",
+            count=5,
+            seed=42,
+            input_func=lambda _: "skip",
+            print_func=outputs.append,
+        )
+        summary = session.run()
+        assert summary["total"] == 5
+        assert summary["completed"] == 5
+        assert summary["skipped"] == 5
+
+    def test_randint_nonzero_helper(self):
+        """Verify randint_nonzero and alias randit_nonzero exclude zero and respect bounds."""
+        from mathstore.study.practice import randit_nonzero, randint_nonzero
+
+        rng = random.Random(123)
+        for _ in range(50):
+            val = randint_nonzero(rng, -5, 5)
+            assert val != 0
+            assert -5 <= val <= 5
+
+            val_alias = randit_nonzero(rng, -3, 3)
+            assert val_alias != 0
+            assert -3 <= val_alias <= 3
+
+    def test_integral_exp_generation(self):
+        """Verify exponential integrals are properly generated with valid antiderivatives."""
+        rng = random.Random(42)
+        q = _gen_integral_question("medium", rng)
+        assert q.topic == "integrals"
+        assert q.question_type == "integral"
+
+    def test_derivative_session_subtype_diversity(self):
+        """Verify that a 5-question derivative session generates diverse subtypes without repeats."""
+        for seed in [1, 42, 99, 123]:
+            session = PracticeSession(
+                topic="derivatives",
+                count=5,
+                seed=seed,
+                input_func=lambda _: "skip",
+                print_func=lambda *args: None,
+            )
+            summary = session.run()
+            assert summary["total"] == 5
+
+            # Verify that session question generation ensures all 5 subtypes are unique
+            rng = random.Random(seed)
+            used: set[str] = set()
+            subtypes = []
+            for _ in range(5):
+                q = generate_question(
+                    topic="derivatives",
+                    difficulty="medium",
+                    rng=rng,
+                    exclude_subtypes=used,
+                )
+                used.add(q.subtype)
+                subtypes.append(q.subtype)
+
+            assert len(set(subtypes)) == 5, f"Seed {seed} had non-unique subtypes: {subtypes}"
+            assert subtypes.count("chain_exp") <= 1
+
+
+class TestPracticeRefactoredSubmodules:
+    """Verifies that the refactored modular practice package and submodules expose expected interfaces."""
+
+    def test_submodule_direct_imports(self):
+        """Direct submodule imports should function cleanly without circular dependencies."""
+        from mathstore.study.practice.evaluators import (
+            _normalize_input_str,
+            check_answer,
+        )
+        from mathstore.study.practice.generators import (
+            CANONICAL_TOPICS,
+            TOPIC_ALIASES,
+            _gen_algebra_question,
+            _gen_derivative_question,
+            _gen_integral_question,
+            _gen_matrix_question,
+            _gen_ode_question,
+            _gen_stats_question,
+            _randint_nonzero,
+            _select_subtype,
+            generate_question,
+            randit_nonzero,
+            randint_nonzero,
+        )
+        from mathstore.study.practice.models import PracticeQuestion
+        from mathstore.study.practice.session import (
+            PracticeSession,
+            format_question_card,
+        )
+
+        assert callable(check_answer)
+        assert callable(_normalize_input_str)
+        assert callable(generate_question)
+        assert callable(randint_nonzero)
+        assert callable(_randint_nonzero)
+        assert callable(randit_nonzero)
+        assert callable(_select_subtype)
+        assert callable(_gen_algebra_question)
+        assert callable(_gen_derivative_question)
+        assert callable(_gen_integral_question)
+        assert callable(_gen_matrix_question)
+        assert callable(_gen_ode_question)
+        assert callable(_gen_stats_question)
+        assert isinstance(CANONICAL_TOPICS, list)
+        assert isinstance(TOPIC_ALIASES, dict)
+        assert PracticeQuestion is not None
+        assert PracticeSession is not None
+        assert callable(format_question_card)
+
+    def test_package_facade_reexports(self):
+        """mathstore.study.practice facade should re-export all symbols identically to submodules."""
+        import mathstore.study.practice as practice_pkg
+        from mathstore.study.practice import evaluators, generators, models, session
+
+        assert practice_pkg.PracticeQuestion is models.PracticeQuestion
+        assert practice_pkg.check_answer is evaluators.check_answer
+        assert practice_pkg._normalize_input_str is evaluators._normalize_input_str
+        assert practice_pkg.generate_question is generators.generate_question
+        assert practice_pkg.CANONICAL_TOPICS is generators.CANONICAL_TOPICS
+        assert practice_pkg.TOPIC_ALIASES is generators.TOPIC_ALIASES
+        assert practice_pkg.randint_nonzero is generators.randint_nonzero
+        assert practice_pkg._randint_nonzero is generators._randint_nonzero
+        assert practice_pkg.randit_nonzero is generators.randit_nonzero
+        assert practice_pkg._select_subtype is generators._select_subtype
+        assert practice_pkg._gen_ode_question is generators._gen_ode_question
+        assert practice_pkg.PracticeSession is session.PracticeSession
+        assert practice_pkg.format_question_card is session.format_question_card
+
+    def test_top_level_study_reexports(self):
+        """mathstore.study facade must maintain backward compatibility for practice symbols."""
+        from mathstore.study import (
+            CANONICAL_TOPICS,
+            PracticeQuestion,
+            PracticeSession,
+            check_answer,
+            format_question_card,
+            generate_question,
+        )
+        from mathstore.study.practice import (
+            CANONICAL_TOPICS as PKG_CANONICAL,
+            PracticeQuestion as PKG_Question,
+            PracticeSession as PKG_Session,
+            check_answer as pkg_check,
+            format_question_card as pkg_format,
+            generate_question as pkg_generate,
+        )
+
+        assert CANONICAL_TOPICS is PKG_CANONICAL
+        assert PracticeQuestion is PKG_Question
+        assert PracticeSession is PKG_Session
+        assert check_answer is pkg_check
+        assert format_question_card is pkg_format
+        assert generate_question is pkg_generate
+
+    def test_all_exports_exist(self):
+        """Every symbol listed in __all__ across all practice modules must exist."""
+        from mathstore.study.practice import (
+            evaluators,
+            generators,
+            models,
+            session,
+        )
+        import mathstore.study.practice as practice_pkg
+
+        for mod in (practice_pkg, evaluators, generators, models, session):
+            assert hasattr(mod, "__all__")
+            for symbol_name in mod.__all__:
+                assert hasattr(mod, symbol_name), f"{mod.__name__} missing exported symbol {symbol_name}"
+
+
+class TestODEPractice:
+    """Tests for ODE practice question generation and answer evaluation."""
+
+    @pytest.mark.parametrize("difficulty", ["easy", "medium", "hard"])
+    def test_ode_generation_difficulties(self, difficulty):
+        for seed in (42, 100, 999):
+            rng = random.Random(seed)
+            q = generate_question("ode", difficulty=difficulty, rng=rng)
+            assert q.topic == "ode"
+            assert q.difficulty == difficulty
+            assert q.question_type == "ode"
+            assert q.prompt
+            assert q.expected_answer
+            assert len(q.steps) > 0
+            assert q.hint
+            assert q.subtype
+            assert isinstance(q.correct_value, dict)
+            assert "equation" in q.correct_value
+
+    def test_ode_topic_aliases(self):
+        for alias in ("ode", "odes", "differential_equations", "diff_eq", "diffeq"):
+            q = generate_question(alias, difficulty="easy")
+            assert q.topic == "ode"
+            assert q.question_type == "ode"
+
+    def test_ode_subtypes_coverage(self):
+        rng = random.Random(42)
+        # easy subtypes
+        easy_subtypes = {"separable_exp", "separable_poly", "separable_ivp"}
+        seen_easy = set()
+        for _ in range(3):
+            q = _gen_ode_question("easy", rng=rng, exclude_subtypes=seen_easy)
+            seen_easy.add(q.subtype)
+        assert easy_subtypes.issubset(seen_easy)
+
+        # medium subtypes
+        med_subtypes = {"linear_const", "linear_x", "linear_ivp"}
+        seen_med = set()
+        for _ in range(3):
+            q = _gen_ode_question("medium", rng=rng, exclude_subtypes=seen_med)
+            seen_med.add(q.subtype)
+        assert med_subtypes.issubset(seen_med)
+
+        # hard subtypes
+        hard_subtypes = {"bernoulli", "homogeneous", "exact"}
+        seen_hard = set()
+        for _ in range(3):
+            q = _gen_ode_question("hard", rng=rng, exclude_subtypes=seen_hard)
+            seen_hard.add(q.subtype)
+        assert hard_subtypes.issubset(seen_hard)
+
+    def test_ode_evaluator_general_solution(self):
+        # Build question for y' = y
+        q = PracticeQuestion(
+            topic="ode",
+            difficulty="easy",
+            prompt="Solve the differential equation: y' = y",
+            expected_answer="C1*exp(x)",
+            hint="Separate variables",
+            steps=["1. Separate variables", "2. Integrate"],
+            question_type="ode",
+            subtype="separable_exp",
+            correct_value={"equation": "y' = y", "is_ivp": False, "expected": "C1*exp(x)"},
+        )
+        # Exact solution format
+        ok, _ = check_answer("y(x) = C1*exp(x)", q)
+        assert ok is True
+
+        # Equivalent with different constant name C
+        ok, _ = check_answer("C*exp(x)", q)
+        assert ok is True
+
+        # Equivalent with y = C * exp(x)
+        ok, _ = check_answer("y = C1 * exp(x)", q)
+        assert ok is True
+
+        # Incorrect solution
+        ok, _ = check_answer("x**2 + C1", q)
+        assert ok is False
+
+        # Trivial zero rejected for general solution
+        ok, msg = check_answer("0", q)
+        assert ok is False
+        assert "trivial" in msg.lower()
+
+    def test_ode_evaluator_ivp(self):
+        # IVP: y' = 2*x, y(0) = 3 -> solution y = x^2 + 3
+        q = PracticeQuestion(
+            topic="ode",
+            difficulty="easy",
+            prompt="Solve the initial value problem: y' = 2*x, y(0) = 3",
+            expected_answer="x**2 + 3",
+            hint="Integrate directly",
+            steps=["Integrate"],
+            question_type="ode",
+            subtype="separable_poly",
+            correct_value={"equation": "y' = 2*x", "is_ivp": True, "expected": "x**2 + 3"},
+        )
+        ok, _ = check_answer("x**2 + 3", q)
+        assert ok is True
+
+        # Satisfies ODE but violates IVP
+        ok, msg = check_answer("x**2 + 5", q)
+        assert ok is False
+        assert "initial condition" in msg.lower()
+
+        # General solution without applying IVP
+        ok, _ = check_answer("x**2 + C1", q)
+        assert ok is False
+
+    def test_ode_evaluator_empty_or_invalid(self):
+        q = PracticeQuestion(
+            topic="ode",
+            difficulty="easy",
+            prompt="Solve: y' = y",
+            expected_answer="C1*exp(x)",
+            hint="Separate variables",
+            steps=[],
+            question_type="ode",
+            correct_value={"equation": "y' = y", "is_ivp": False, "expected": "C1*exp(x)"},
+        )
+        ok, _ = check_answer("", q)
+        assert ok is False
+        ok, _ = check_answer("not math @@@", q)
+        assert ok is False

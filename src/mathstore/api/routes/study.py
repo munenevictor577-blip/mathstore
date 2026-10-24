@@ -6,6 +6,7 @@ from mathstore.api.schemas import (
     DerivativeStepsRequest,
     EquationStepsRequest,
     IntegralStepsRequest,
+    ODEStepsRequest,
     PracticeCheckRequest,
     PracticeCheckResponse,
     PracticeQuestionResponse,
@@ -23,6 +24,7 @@ from mathstore.study.steps import (
     get_derivative_steps,
     get_equation_steps,
     get_integral_steps,
+    get_ode_steps,
 )
 
 router = APIRouter(tags=["Study, Steps & Practice"])
@@ -125,6 +127,37 @@ def steps_equation_get(
     )
 
 
+@router.post(
+    "/steps/ode",
+    response_model=StepsResponse,
+    summary="Step-by-step ODE solution breakdown",
+)
+def steps_ode_post(req: ODEStepsRequest) -> StepsResponse:
+    """Returns pedagogical step-by-step derivation for solving an ODE."""
+    try:
+        steps = get_ode_steps(
+            req.equation, variable=req.variable, function=req.function
+        )
+        return StepsResponse(query=req.equation, steps=steps)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get(
+    "/steps/ode",
+    response_model=StepsResponse,
+    summary="Step-by-step ODE solution (GET query)",
+)
+def steps_ode_get(
+    equation: str = Query(..., description="Differential equation to explain"),
+    variable: str = Query("x", description="Independent variable"),
+    function: str = Query("y", description="Dependent function"),
+) -> StepsResponse:
+    return steps_ode_post(
+        ODEStepsRequest(equation=equation, variable=variable, function=function)
+    )
+
+
 # --- Practice Endpoints ---
 @router.get(
     "/practice/question",
@@ -134,7 +167,7 @@ def steps_equation_get(
 def practice_question_get(
     topic: str = Query(
         "all",
-        description="Topic: derivatives, integrals, algebra, matrix, stats, or all",
+        description="Topic: derivatives, integrals, algebra, matrix, stats, ode, or all",
     ),
     difficulty: str = Query(
         "medium", description="Difficulty: easy, medium, hard, or all"
