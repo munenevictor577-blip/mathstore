@@ -30,10 +30,15 @@ TOPIC_ALIASES = {
     "stat": "stats",
     "stats": "stats",
     "statistics": "stats",
+    "ode": "ode",
+    "odes": "ode",
+    "differential_equations": "ode",
+    "diff_eq": "ode",
+    "diffeq": "ode",
     "all": "all",
 }
 
-CANONICAL_TOPICS = ["derivatives", "integrals", "algebra", "matrix", "stats"]
+CANONICAL_TOPICS = ["derivatives", "integrals", "algebra", "matrix", "stats", "ode"]
 
 __all__ = [
     "CANONICAL_TOPICS",
@@ -42,6 +47,7 @@ __all__ = [
     "_gen_derivative_question",
     "_gen_integral_question",
     "_gen_matrix_question",
+    "_gen_ode_question",
     "_gen_stats_question",
     "_randint_nonzero",
     "_select_subtype",
@@ -697,6 +703,125 @@ def _gen_stats_question(difficulty: str, rng: random.Random) -> PracticeQuestion
     )
 
 
+def _gen_ode_question(
+    difficulty: str,
+    rng: random.Random,
+    exclude_subtypes: set[str] | list[str] | None = None,
+) -> PracticeQuestion:
+    from mathstore.ode.solver import ODESolver
+    solver = ODESolver()
+    if difficulty == "easy":
+        subtypes = ["separable_exp", "separable_poly", "separable_ivp"]
+        subtype = _select_subtype(rng, subtypes, exclude_subtypes)
+        if subtype == "separable_exp":
+            k = randint_nonzero(rng, -3, 3, exclude=(0,))
+            eq_str = f"y' = {k}*y"
+            prompt = f"Solve the separable differential equation for y(x): {eq_str}"
+            expected = f"C1*exp({k}*x)"
+            hint = "Separate variables: (1/y) dy = k dx, then integrate both sides."
+            steps = solver.get_steps(eq_str)
+        elif subtype == "separable_poly":
+            a = rng.randint(2, 6)
+            n = rng.choice([1, 2])
+            if n == 1:
+                eq_str = f"y' = {a}*x"
+                expected = f"{sp.Rational(a, 2)}*x**2 + C1"
+            else:
+                eq_str = f"y' = {a}*x**2"
+                expected = f"{sp.Rational(a, 3)}*x**3 + C1"
+            prompt = f"Find the general solution to the differential equation: {eq_str}"
+            hint = "Directly integrate both sides with respect to x: y(x) = ∫ f(x) dx + C1."
+            steps = solver.get_steps(eq_str)
+        else:  # separable_ivp
+            k = rng.choice([2, 3, -1, -2])
+            y0 = rng.randint(1, 5)
+            eq_str = f"y' = {k}*y"
+            ics_str = f"y(0) = {y0}"
+            prompt = f"Solve the initial value problem: {eq_str}, with {ics_str}"
+            expected = f"{y0}*exp({k}*x)"
+            hint = f"Find the general solution y(x) = C1*exp({k}*x), then use y(0) = {y0} to find C1."
+            steps = solver.get_steps(eq_str) + [
+                f"Apply initial condition {ics_str}:",
+                f"   y(0) = C1*exp(0) = C1 = {y0}",
+                f"Particular solution: y(x) = {expected}",
+            ]
+        # Pass a dictionary so the evaluator knows if it's an IVP
+        correct_val = {"equation": eq_str, "is_ivp": "ivp" in subtype, "expected": expected}
+       
+        return PracticeQuestion(
+            topic="ode", difficulty=difficulty, prompt=prompt, expected_answer=expected,
+            hint=hint, steps=steps, question_type="ode", correct_value=correct_val,
+            variable="x", subtype=subtype,
+        )
+    if difficulty == "medium":
+        subtypes = ["linear_const", "linear_x", "linear_ivp"]
+        subtype = _select_subtype(rng, subtypes, exclude_subtypes)
+        if subtype == "linear_const":
+            a = rng.choice([1, 2, 3])
+            b = rng.choice([2, 4, 6])
+            eq_str = f"y' + {a}*y = {b}"
+            expected = f"{sp.Rational(b, a)} + C1*exp(-{a}*x)"
+            prompt = f"Solve the first-order linear differential equation: {eq_str}"
+            hint = f"Identify P(x) = {a} and compute the integrating factor IF = exp(∫ {a} dx) = exp({a}*x)."
+            steps = solver.get_steps(eq_str)
+        elif subtype == "linear_x":
+            eq_str = "x*y' + y = x**2"
+            expected = "(C1 + x**3/3)/x"
+            prompt = f"Solve the first-order differential equation: {eq_str}"
+            hint = "Notice that the left-hand side is the derivative of a product: d/dx[x*y] = x*y' + y."
+            steps = solver.get_steps(eq_str)
+        else:  # linear_ivp
+            a = rng.choice([1, 2])
+            b = rng.choice([2, 4])
+            y0 = rng.randint(1, 4)
+            eq_str = f"y' + {a}*y = {b}"
+            ics_str = f"y(0) = {y0}"
+            prompt = f"Solve the initial value problem: {eq_str}, with {ics_str}"
+            expected = str(solver.solve(eq_str, ics=ics_str, format="rhs"))
+            hint = f"Find general solution y(x) = {sp.Rational(b, a)} + C1*exp(-{a}*x), then evaluate at {ics_str}."
+            steps = solver.get_steps(eq_str) + [
+                f"Apply initial condition {ics_str}:",
+                f"   Particular solution: y(x) = {expected}",
+            ]
+        correct_val = {"equation": eq_str, "is_ivp": "ivp" in subtype, "expected": expected}
+        return PracticeQuestion(
+            topic="ode", difficulty=difficulty, prompt=prompt, expected_answer=expected,
+            hint=hint, steps=steps, question_type="ode", correct_value=correct_val,
+            variable="x", subtype=subtype,
+        )
+    # Hard: bernoulli, homogeneous, exact
+    subtypes = ["bernoulli", "homogeneous", "exact"]
+    subtype = _select_subtype(rng, subtypes, exclude_subtypes)
+    if subtype == "bernoulli":
+        choice_pool = [
+            ("y' + y = y**2", "1 / (C1*exp(x) + 1)", "Divide by y**2 and substitute v = 1/y to linearize."),
+            ("x*y' + y = x**2*y**2", "1 / (x*(C1 - x))", "Divide by y**2 and substitute v = 1/y to obtain a linear equation."),
+        ]
+        eq_str, expected, hint = rng.choice(choice_pool)
+        prompt = f"Solve the Bernoulli differential equation: {eq_str}"
+        steps = solver.get_steps(eq_str)
+    elif subtype == "homogeneous":
+        choice_pool = [
+            ("y' = (x + y)/x", "x*(C1 + log(x))", "Substitute y = v*x, giving y' = v + x*(dv/dx), then separate v and x."),
+            ("x*y' = y - x", "x*(C1 - log(x))", "Substitute y = v*x to transform into a separable ODE in v."),
+        ]
+        eq_str, expected, hint = rng.choice(choice_pool)
+        prompt = f"Solve the homogeneous differential equation: {eq_str}"
+        steps = solver.get_steps(eq_str)
+    else:  # exact
+        choice_pool = [
+            ("(2*x + y) + (x + 2*y)*y' = 0", "x**2 + x*y + y**2 = C1", "Verify ∂M/∂y = ∂N/∂x, then find potential function Ψ(x, y) = C1."),
+        ]
+        eq_str, expected, hint = rng.choice(choice_pool)
+        prompt = f"Solve the exact differential equation (express implicitly): {eq_str}"
+        steps = solver.get_steps(eq_str)
+    correct_val = {"equation": eq_str, "is_ivp": False, "expected": expected}
+    return PracticeQuestion(
+        topic="ode", difficulty=difficulty, prompt=prompt, expected_answer=expected,
+        hint=hint, steps=steps, question_type="ode", correct_value=correct_val,
+        variable="x", subtype=subtype,
+    )
+
 def generate_question(
     topic: str = "all",
     difficulty: str = "medium",
@@ -730,5 +855,9 @@ def generate_question(
         return _gen_matrix_question(chosen_diff, rng)
     if canonical_topic == "stats":
         return _gen_stats_question(chosen_diff, rng)
+    if canonical_topic == "ode":
+        return _gen_ode_question(
+            chosen_diff, rng, exclude_subtypes=exclude_subtypes
+        )
 
     return _gen_derivative_question(chosen_diff, rng, exclude_subtypes=exclude_subtypes)

@@ -144,6 +144,101 @@ def check_answer(user_input: str, question: PracticeQuestion) -> tuple[bool, str
         except Exception as e:  # noqa: BLE001
             return False, f"Syntax error in mathematical expression: {e}"
 
+    if q_type == "ode":
+        # 1. Setup namespace with integration constants
+        locs = {"C1": sp.Symbol("C1"), "C": sp.Symbol("C"), "c": sp.Symbol("c"), "c1": sp.Symbol("c1")}
+
+        # 2. Normalize user input
+        norm_user = _normalize_input_str(raw)
+
+        eq_str = None
+        is_ivp = False
+        expected_raw = question.expected_answer
+
+        if isinstance(question.correct_value, dict):
+            eq_str = question.correct_value.get("equation")
+            is_ivp = question.correct_value.get("is_ivp", False)
+            expected_raw = question.correct_value.get(
+                "expected", question.correct_value.get("solution", question.expected_answer)
+            )
+        elif isinstance(question.correct_value, str):
+            expected_raw = question.correct_value
+
+        try:
+            expected_str = str(expected_raw).strip()
+
+            if is_ivp:
+                if "=" in norm_user:
+                    u_lhs, u_rhs = norm_user.split("=", 1)
+                    user_val = (
+                        safe_sympify(u_rhs, locals_dict=locs)
+                        if u_lhs.strip() in (question.variable, "y", f"y({question.variable})")
+                        else safe_sympify(norm_user, locals_dict=locs)
+                    )
+                else:
+                    user_val = safe_sympify(norm_user, locals_dict=locs)
+
+                if "=" in expected_str:
+                    e_lhs, e_rhs = expected_str.split("=", 1)
+                    exp_val = (
+                        safe_sympify(e_rhs, locals_dict=locs)
+                        if e_lhs.strip() in (question.variable, "y", f"y({question.variable})")
+                        else safe_sympify(expected_str, locals_dict=locs)
+                    )
+                else:
+                    exp_val = safe_sympify(expected_str, locals_dict=locs)
+
+                if sp.simplify(user_val - exp_val) == 0:
+                    return True, "✓ Correct!"
+
+                if eq_str:
+                    from mathstore.ode.solver import ODESolver
+
+                    solver = ODESolver()
+                    if solver.check_solution(eq_str, norm_user, var=question.variable):
+                        return (
+                            False,
+                            "Solution satisfies the differential equation but fails the initial condition.",
+                        )
+
+                return (
+                    False,
+                    "Particular solution is incorrect. Check your initial condition substitution.",
+                )
+
+            # General solution:
+            user_stripped = norm_user.strip()
+            if user_stripped in ("0", "0.0", "y=0", "y(x)=0", "y = 0", "y(x) = 0"):
+                if "C" in expected_str or "c" in expected_str:
+                    return (
+                        False,
+                        "Trivial solution y = 0 is not the general solution. Include the constant of integration (e.g. C1).",
+                    )
+
+            from mathstore.ode.solver import ODESolver
+
+            solver = ODESolver()
+            if eq_str and solver.check_solution(eq_str, norm_user, var=question.variable):
+                return True, "✓ Correct!"
+
+            if "=" in norm_user and "=" in expected_str:
+                u_lhs, u_rhs = norm_user.split("=", 1)
+                e_lhs, e_rhs = expected_str.split("=", 1)
+                u_diff = safe_sympify(u_lhs, locals_dict=locs) - safe_sympify(u_rhs, locals_dict=locs)
+                e_diff = safe_sympify(e_lhs, locals_dict=locs) - safe_sympify(e_rhs, locals_dict=locs)
+                if sp.simplify(u_diff - e_diff) == 0 or sp.simplify(u_diff + e_diff) == 0:
+                    return True, "✓ Correct!"
+            else:
+                u_expr = safe_sympify(norm_user, locals_dict=locs)
+                e_expr = safe_sympify(expected_str, locals_dict=locs)
+                if sp.simplify(u_expr - e_expr) == 0:
+                    return True, "✓ Correct!"
+
+            return False, "Candidate solution does not satisfy the differential equation."
+
+        except Exception as e:
+            return False, f"Syntax error in ODE solution: {e}"
+
     if q_type in ("derivative", "symbolic"):
         try:
             norm = _normalize_input_str(raw)

@@ -242,7 +242,7 @@ def main():
         type=str,
         nargs="?",
         default="all",
-        help="Practice topic (derivatives, integrals, algebra, matrix, stats, or all)",
+        help="Practice topic (derivatives, integrals, algebra, matrix, stats, ode, or all)",
     )
     practice_p.add_argument(
         "--topic",

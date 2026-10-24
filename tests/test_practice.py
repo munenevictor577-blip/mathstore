@@ -1,6 +1,7 @@
 import random
 from unittest.mock import patch
 
+import pytest
 import sympy as sp
 
 from mathstore.study.practice import (
@@ -12,6 +13,7 @@ from mathstore.study.practice import (
     _gen_derivative_question,
     _gen_integral_question,
     _gen_matrix_question,
+    _gen_ode_question,
     _gen_stats_question,
     check_answer,
     format_question_card,
@@ -689,6 +691,7 @@ class TestPracticeRefactoredSubmodules:
             _gen_derivative_question,
             _gen_integral_question,
             _gen_matrix_question,
+            _gen_ode_question,
             _gen_stats_question,
             _randint_nonzero,
             _select_subtype,
@@ -713,6 +716,7 @@ class TestPracticeRefactoredSubmodules:
         assert callable(_gen_derivative_question)
         assert callable(_gen_integral_question)
         assert callable(_gen_matrix_question)
+        assert callable(_gen_ode_question)
         assert callable(_gen_stats_question)
         assert isinstance(CANONICAL_TOPICS, list)
         assert isinstance(TOPIC_ALIASES, dict)
@@ -735,6 +739,7 @@ class TestPracticeRefactoredSubmodules:
         assert practice_pkg._randint_nonzero is generators._randint_nonzero
         assert practice_pkg.randit_nonzero is generators.randit_nonzero
         assert practice_pkg._select_subtype is generators._select_subtype
+        assert practice_pkg._gen_ode_question is generators._gen_ode_question
         assert practice_pkg.PracticeSession is session.PracticeSession
         assert practice_pkg.format_question_card is session.format_question_card
 
@@ -778,3 +783,130 @@ class TestPracticeRefactoredSubmodules:
             assert hasattr(mod, "__all__")
             for symbol_name in mod.__all__:
                 assert hasattr(mod, symbol_name), f"{mod.__name__} missing exported symbol {symbol_name}"
+
+
+class TestODEPractice:
+    """Tests for ODE practice question generation and answer evaluation."""
+
+    @pytest.mark.parametrize("difficulty", ["easy", "medium", "hard"])
+    def test_ode_generation_difficulties(self, difficulty):
+        for seed in (42, 100, 999):
+            rng = random.Random(seed)
+            q = generate_question("ode", difficulty=difficulty, rng=rng)
+            assert q.topic == "ode"
+            assert q.difficulty == difficulty
+            assert q.question_type == "ode"
+            assert q.prompt
+            assert q.expected_answer
+            assert len(q.steps) > 0
+            assert q.hint
+            assert q.subtype
+            assert isinstance(q.correct_value, dict)
+            assert "equation" in q.correct_value
+
+    def test_ode_topic_aliases(self):
+        for alias in ("ode", "odes", "differential_equations", "diff_eq", "diffeq"):
+            q = generate_question(alias, difficulty="easy")
+            assert q.topic == "ode"
+            assert q.question_type == "ode"
+
+    def test_ode_subtypes_coverage(self):
+        rng = random.Random(42)
+        # easy subtypes
+        easy_subtypes = {"separable_exp", "separable_poly", "separable_ivp"}
+        seen_easy = set()
+        for _ in range(3):
+            q = _gen_ode_question("easy", rng=rng, exclude_subtypes=seen_easy)
+            seen_easy.add(q.subtype)
+        assert easy_subtypes.issubset(seen_easy)
+
+        # medium subtypes
+        med_subtypes = {"linear_const", "linear_x", "linear_ivp"}
+        seen_med = set()
+        for _ in range(3):
+            q = _gen_ode_question("medium", rng=rng, exclude_subtypes=seen_med)
+            seen_med.add(q.subtype)
+        assert med_subtypes.issubset(seen_med)
+
+        # hard subtypes
+        hard_subtypes = {"bernoulli", "homogeneous", "exact"}
+        seen_hard = set()
+        for _ in range(3):
+            q = _gen_ode_question("hard", rng=rng, exclude_subtypes=seen_hard)
+            seen_hard.add(q.subtype)
+        assert hard_subtypes.issubset(seen_hard)
+
+    def test_ode_evaluator_general_solution(self):
+        # Build question for y' = y
+        q = PracticeQuestion(
+            topic="ode",
+            difficulty="easy",
+            prompt="Solve the differential equation: y' = y",
+            expected_answer="C1*exp(x)",
+            hint="Separate variables",
+            steps=["1. Separate variables", "2. Integrate"],
+            question_type="ode",
+            subtype="separable_exp",
+            correct_value={"equation": "y' = y", "is_ivp": False, "expected": "C1*exp(x)"},
+        )
+        # Exact solution format
+        ok, _ = check_answer("y(x) = C1*exp(x)", q)
+        assert ok is True
+
+        # Equivalent with different constant name C
+        ok, _ = check_answer("C*exp(x)", q)
+        assert ok is True
+
+        # Equivalent with y = C * exp(x)
+        ok, _ = check_answer("y = C1 * exp(x)", q)
+        assert ok is True
+
+        # Incorrect solution
+        ok, _ = check_answer("x**2 + C1", q)
+        assert ok is False
+
+        # Trivial zero rejected for general solution
+        ok, msg = check_answer("0", q)
+        assert ok is False
+        assert "trivial" in msg.lower()
+
+    def test_ode_evaluator_ivp(self):
+        # IVP: y' = 2*x, y(0) = 3 -> solution y = x^2 + 3
+        q = PracticeQuestion(
+            topic="ode",
+            difficulty="easy",
+            prompt="Solve the initial value problem: y' = 2*x, y(0) = 3",
+            expected_answer="x**2 + 3",
+            hint="Integrate directly",
+            steps=["Integrate"],
+            question_type="ode",
+            subtype="separable_poly",
+            correct_value={"equation": "y' = 2*x", "is_ivp": True, "expected": "x**2 + 3"},
+        )
+        ok, _ = check_answer("x**2 + 3", q)
+        assert ok is True
+
+        # Satisfies ODE but violates IVP
+        ok, msg = check_answer("x**2 + 5", q)
+        assert ok is False
+        assert "initial condition" in msg.lower()
+
+        # General solution without applying IVP
+        ok, _ = check_answer("x**2 + C1", q)
+        assert ok is False
+
+    def test_ode_evaluator_empty_or_invalid(self):
+        q = PracticeQuestion(
+            topic="ode",
+            difficulty="easy",
+            prompt="Solve: y' = y",
+            expected_answer="C1*exp(x)",
+            hint="Separate variables",
+            steps=[],
+            question_type="ode",
+            correct_value={"equation": "y' = y", "is_ivp": False, "expected": "C1*exp(x)"},
+        )
+        ok, _ = check_answer("", q)
+        assert ok is False
+        ok, _ = check_answer("not math @@@", q)
+        assert ok is False

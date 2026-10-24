@@ -506,6 +506,8 @@ class ODESolver:
                     # For higher power Bernoulli equations, avoiding full root expansion
                     # prevents combinatorial explosion while yielding a clean implicit form
                     kwargs["simplify"] = False
+                elif "1st_exact" in available_hints and available_hints[0] == "factorable":
+                    kwargs["hint"] = "1st_exact"
             except Exception:
                 pass
 
@@ -559,6 +561,12 @@ class ODESolver:
             sol_eq = sp.Eq(f_app, safe_sympify(solution, variable=var))
         elif isinstance(solution, str):
             clean_sol = solution.strip()
+            # If bare function name (e.g. 'y' without '(x)') appears, replace with 'y(x)'
+            clean_sol = re.sub(
+                r"\b" + re.escape(func) + r"\b(?!\s*[\(])",
+                f"{func}({var})",
+                clean_sol,
+            )
 
             # Inject standard integration constants to prevent parsing failures
             locs = {

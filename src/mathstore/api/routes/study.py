@@ -167,7 +167,7 @@ def steps_ode_get(
 def practice_question_get(
     topic: str = Query(
         "all",
-        description="Topic: derivatives, integrals, algebra, matrix, stats, or all",
+        description="Topic: derivatives, integrals, algebra, matrix, stats, ode, or all",
     ),
     difficulty: str = Query(
         "medium", description="Difficulty: easy, medium, hard, or all"
