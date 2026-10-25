@@ -5,7 +5,11 @@
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://python.org)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-**MathStore** is a clean, modular mathematical toolkit and interactive CLI designed for university students, educators, and STEM practitioners. It covers **symbolic calculus**, **step-by-step derivations**, **linear algebra**, **probability & statistics**, **formula cheat sheets**, and an **active-recall practice quizzer**.
+**MathStore** is a clean, modular mathematical toolkit and interactive CLI designed for university students, educators, and STEM practitioners. It covers **symbolic calculus**, **ordinary differential equations (ODEs)**, **step-by-step derivations**, **linear algebra**, **probability & statistics**, **formula cheat sheets**, and an **adaptive active-recall practice quizzer**.
+
+<p align="center">
+  <img src="docs/demo.gif" alt="MathStore Adaptive Practice & ODE Step Verification Demo" width="850">
+</p>
 
 ---
 
@@ -105,7 +109,7 @@ Derivative (order 1): x**2*cos(x) + 2*x*sin(x)
 
 Interactive quizzer designed for exam preparation and active revision with randomized problems, hints, symbolic equivalence verification, and step-by-step solution reveals.
 
-- **Topics**: `derivatives` (alias: `calc`, `diff`), `integrals` (alias: `int`), `algebra` (alias: `solve`), `matrix` (alias: `linalg`), `stats`, or `all`
+- **Topics**: `ode` (alias: `odes`, `diff_eq`, `diffeq`), `derivatives` (alias: `calc`, `diff`), `integrals` (alias: `int`), `algebra` (alias: `solve`), `matrix` (alias: `linalg`), `stats`, or `all`
 - **Difficulties**: `easy`, `medium`, `hard`
 - **Smart Equivalence**: Accepts standard math inputs (`^` or `**`, `+ C`, arbitrary constants, permuted products, multi-root sets e.g. `2, 3` or `[2, 3]`).
 
@@ -116,6 +120,7 @@ Interactive quizzer designed for exam preparation and active revision with rando
 mathstore practice
 
 # Target specific subject and difficulty
+mathstore practice ode --difficulty medium
 mathstore practice derivatives --difficulty medium
 mathstore practice matrix --difficulty hard -n 3
 ```
