@@ -1,4 +1,71 @@
-# Release Notes - MathStore v0.1.0
+# Release Notes - MathStore
+
+## Version 0.1.2
+
+**Release Date:** October 25, 2026  
+**Tag:** `v0.1.2`  
+**License:** MIT  
+
+---
+
+### 🌟 Overview
+
+**MathStore v0.1.2** introduces full support for **Ordinary Differential Equations (ODEs)** across both analytical solving and the interactive active-recall practice quizzer. This release expands MathStore's symbolic capabilities to first- and higher-order ODEs, adds deterministic step-by-step derivations, provides intelligent student answer evaluation with formative feedback, and integrates comprehensive FastAPI REST endpoints.
+
+---
+
+### 🚀 Key Features & Highlights
+
+#### 1. Ordinary Differential Equation (ODE) Engine
+- **High-Performance `ODESolver`**:
+  - Analytical solving with classification across **Separable**, **First-Order Linear**, **Bernoulli**, **Homogeneous**, and **Exact** differential equations.
+  - **Initial Value Problem (IVP)** resolution with point conditions (e.g. `y(0) = 3`).
+  - **Natural Syntax Parsing**: Accepts Leibniz notation (`dy/dx`, `d2y/dx2`), prime notation (`y'`, `y''`), and variable juxtaposition (`2xy`, `xy'`).
+  - **Fast-Path Heuristics**: Optimized hint selection bypassing combinatorial factoring slowdowns for exact equations.
+  - **Candidate Solution Verification (`check_solution`)**: Evaluates explicit and implicit candidate solutions using differential operator substitution via SymPy's `checkodesol`.
+
+#### 2. Step-by-Step Analytical Derivations (`--steps`)
+- Traceable pedagogical derivations for ODE solving:
+  - Classifying the equation type.
+  - Variable separation and algebraic rearrangement.
+  - Integrating factor ($\mu(x) = \exp(\int P(x) dx)$) calculation and distribution.
+  - Auxiliary variable substitution ($v = y^{1-n}$ for Bernoulli, $v = y/x$ for Homogeneous).
+  - Integration of both sides and explicit functional inversion.
+  - Particular constant resolution for initial conditions.
+
+#### 3. Active-Recall ODE Practice (`mathstore practice ode`)
+- Interactive question generator and evaluator for ODE revision:
+  - **Difficulty Tiers**:
+    - `easy`: Separable exponential growth/decay, separable polynomials, basic IVPs.
+    - `medium`: Linear constant coefficients, linear variable coefficients, linear IVPs.
+    - `hard`: Bernoulli, homogeneous substitutions, exact equations.
+  - **Zero-Hallucination Evaluation**:
+    - Accepts arbitrary constant variations (`C1`, `C`, `c`).
+    - Distinguishes between equations failing the differential operator vs. equations failing initial boundary conditions.
+    - Detects and rejects trivial zero solutions ($y = 0$) for non-zero general solutions.
+    - Accepts both explicit and implicit mathematical inputs.
+
+#### 4. REST API Expansion (`/math/ode`)
+- New FastAPI endpoints with OpenAPI 3.1 schema documentation:
+  - `POST /ode/solve`: Solves ODE with optional IVP and step derivations.
+  - `POST /ode/classify`: Returns classification heuristics.
+  - `POST /ode/verify`: Verifies whether a candidate solution satisfies an equation.
+  - `POST /ode/steps`: Returns step-by-step analytical derivation trees.
+  - `POST /practice/question` and `POST /practice/check`: Active-recall practice problem generation and evaluation.
+
+#### 5. Documentation & Media
+- Added comprehensive engineering case study in `docs/portfolio.md` detailing the intersection of symbolic computation and educational pedagogy.
+- Embedded terminal screen recording (`docs/demo.gif`) and VHS tape script (`docs/demo.tape`) in documentation.
+
+---
+
+### 🧪 Test Verification
+- **Test Suite**: 179 passing automated tests across calculus, algebra, matrix, statistics, ODEs, CLI, and API routes.
+- **Coverage**: Comprehensive unit and integration test coverage across all new ODE submodules and practice generators.
+
+---
+
+## Version 0.1.0
 
 **Release Date:** September 20, 2026  
 **Tag:** `v0.1.0`  
