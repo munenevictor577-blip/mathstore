@@ -266,6 +266,8 @@ def select_adaptive_subtype(topic_profile: dict[str, Any], candidate_subtypes: l
 
 Below is the verified interactive terminal recording of MathStore in action—generating an ODE problem, requesting a hint, verifying a step with exact symbolic checking, and updating the student profile.
 
+![MathStore ODE Practice Demo](./demo.gif)
+
 ### Asciinema / VHS Terminal Simulation
 
 ```text

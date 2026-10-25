@@ -18,7 +18,7 @@ Sleep 2s
 # Request a pedagogical hint
 Type "hint"
 Enter
-Sleep 2s
+Sleep 4s
 
 # Provide correct explicit answer with arbitrary constant C1
 Type "y = 2 + C1*exp(-2*x)"
