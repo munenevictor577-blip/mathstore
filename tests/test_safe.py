@@ -91,3 +91,15 @@ def test_safe_sympify_with_locals_dict():
     custom_sym = sp.Symbol("custom")
     result = safe_sympify("custom * 2", locals_dict={"custom": custom_sym})
     assert result == custom_sym * sp.Integer(2)
+
+
+def test_safe_sympify_equation_parsing():
+    eq = safe_sympify("2x + 6y = 0")
+    assert isinstance(eq, sp.Eq)
+    assert eq.lhs == safe_sympify("2x + 6y")
+    assert eq.rhs == sp.Integer(0)
+
+
+def test_safe_sympify_multiple_equals_error():
+    with pytest.raises(ValueError, match="at most one '='"):
+        safe_sympify("x = y = 2")

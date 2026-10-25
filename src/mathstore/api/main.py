@@ -8,6 +8,7 @@ from mathstore.api.routes import (
     algebra_router,
     calculus_router,
     matrix_router,
+    ode_router,
     statistics_router,
     study_router,
 )
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     math_router.include_router(calculus_router)
     math_router.include_router(algebra_router)
     math_router.include_router(matrix_router)
+    math_router.include_router(ode_router)
     math_router.include_router(statistics_router)
     math_router.include_router(study_router)
 
